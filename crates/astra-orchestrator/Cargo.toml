@@ -1,0 +1,35 @@
+[package]
+name = "astra-orchestrator"
+description = "Orchestrator Engine for ASTRA_ - coordinates multi-agent workflows"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+astra-types.workspace = true
+astra-runtime.workspace = true
+astra-capability.workspace = true
+astra-context.workspace = true
+astra-persistence.workspace = true
+astra-policy.workspace = true
+astra-sandbox.workspace = true
+astra-gateway.workspace = true
+astra-observability.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+
+[lints]
+workspace = true

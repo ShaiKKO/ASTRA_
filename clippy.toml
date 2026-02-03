@@ -1,0 +1,26 @@
+# ASTRA_ Clippy Lint Configuration
+# Enforced via CI: cargo clippy --all-targets --all-features -- -D warnings
+
+# Cognitive complexity threshold for functions
+cognitive-complexity-threshold = 25
+
+# Maximum number of lines in a function
+too-many-lines-threshold = 100
+
+# Maximum number of arguments a function can have
+too-many-arguments-threshold = 7
+
+# Type complexity threshold
+type-complexity-threshold = 250
+
+# Disallow certain methods
+disallowed-methods = [
+    # Prevent accidental panics in production code
+    { path = "std::option::Option::unwrap", reason = "Use ok_or() with AstraError instead" },
+    { path = "std::option::Option::expect", reason = "Use ok_or() with AstraError instead" },
+    { path = "std::result::Result::unwrap", reason = "Use ? operator or map_err() instead" },
+    { path = "std::result::Result::expect", reason = "Use ? operator or map_err() instead" },
+]
+
+# Allow certain patterns that are acceptable in ASTRA_
+allow-unwrap-in-tests = true

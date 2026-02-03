@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+//! ASTRA_ Types — Shared data contracts.
+//!
+//! Canonical data structures used throughout ASTRA_: TaskEnvelope, Outcome,
+//! AgentProfile, CapabilityContract, PolicyDecision, Artifact, ContextItem,
+//! RunReport, ModelInvocation, and AstraError.
+//!
+//! # Design
+//! - All types derive Serialize/Deserialize.
+//! - Validation-ready schemas.
+//! - Correlation IDs propagate end-to-end.
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn crate_compiles() {
+        // Stub test - implementation pending
+    }
+}

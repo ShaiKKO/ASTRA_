@@ -1,0 +1,7 @@
+# ASTRA_ Rust Toolchain Configuration
+# Pins Rust version for reproducible builds across all environments
+# Using stable channel to support modern dependency requirements
+
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy", "rust-analyzer"]

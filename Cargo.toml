@@ -1,0 +1,95 @@
+# ASTRA_ Workspace Configuration
+# Production-grade, local-first, pluggable multi-agent orchestration framework
+
+[workspace]
+resolver = "2"
+members = [
+    # Core crates (11)
+    "crates/astra-types",
+    "crates/astra-core",
+    "crates/astra-runtime",
+    "crates/astra-capability",
+    "crates/astra-context",
+    "crates/astra-persistence",
+    "crates/astra-policy",
+    "crates/astra-sandbox",
+    "crates/astra-orchestrator",
+    "crates/astra-gateway",
+    "crates/astra-observability",
+    # Intelligence layer crates (4)
+    "crates/astra-experience",
+    "crates/astra-context-intel",
+    "crates/astra-quality",
+    "crates/astra-semantic",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ShaiKKO/ASTRA_"
+authors = ["ASTRA_ Contributors"]
+keywords = ["ai", "agents", "orchestration", "multi-agent", "llm"]
+categories = ["development-tools", "asynchronous"]
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Tracing and observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# HTTP client (for Model Gateway)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# UUID generation
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async traits
+async-trait = "0.1"
+
+# Configuration
+config = "0.14"
+
+# Testing
+pretty_assertions = "1.4"
+
+# Workspace crate dependencies (for inter-crate references)
+astra-types = { path = "crates/astra-types" }
+astra-core = { path = "crates/astra-core" }
+astra-runtime = { path = "crates/astra-runtime" }
+astra-capability = { path = "crates/astra-capability" }
+astra-context = { path = "crates/astra-context" }
+astra-persistence = { path = "crates/astra-persistence" }
+astra-policy = { path = "crates/astra-policy" }
+astra-sandbox = { path = "crates/astra-sandbox" }
+astra-orchestrator = { path = "crates/astra-orchestrator" }
+astra-gateway = { path = "crates/astra-gateway" }
+astra-observability = { path = "crates/astra-observability" }
+astra-experience = { path = "crates/astra-experience" }
+astra-context-intel = { path = "crates/astra-context-intel" }
+astra-quality = { path = "crates/astra-quality" }
+astra-semantic = { path = "crates/astra-semantic" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "warn"
+unimplemented = "warn"
