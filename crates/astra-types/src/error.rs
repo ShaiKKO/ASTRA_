@@ -1,0 +1,605 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+//! Unified error taxonomy for ASTRA_.
+//!
+//! All errors in the system carry rich metadata for observability and debugging.
+//! The grep-friendly format `[ASTRA-{CATEGORY}-{CODE}]` enables log analysis.
+//!
+//! # Design
+//!
+//! Single enum with exhaustive variants enables compile-time matching.
+//! Every variant embeds `ErrorContext` for uniform metadata access.
+//!
+//! # Error Codes
+//!
+//! | Prefix | Category |
+//! |--------|----------|
+//! | POL | Policy violations |
+//! | BUD | Budget exceeded |
+//! | SBX | Sandbox violations |
+//! | CON | Contract mismatches |
+//! | BAK | Backend failures |
+//! | PRV | Provider errors |
+//! | VAL | Validation failures |
+//! | CFL | Conflicts |
+
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// Severity level for errors and diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Severity {
+    /// System is unusable, immediate intervention required.
+    Critical,
+    /// Operation failed, requires attention.
+    #[default]
+    Error,
+    /// Potential issue, operation continued.
+    Warning,
+    /// Informational, no action needed.
+    Info,
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Critical => write!(f, "CRITICAL"),
+            Self::Error => write!(f, "ERROR"),
+            Self::Warning => write!(f, "WARNING"),
+            Self::Info => write!(f, "INFO"),
+        }
+    }
+}
+
+/// Budget categories tracked by the system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BudgetType {
+    /// LLM token consumption.
+    Tokens,
+    /// Wall-clock execution time in milliseconds.
+    TimeMs,
+    /// Estimated cost in USD (microdollars for precision).
+    CostUsd,
+    /// Number of discrete actions taken.
+    Actions,
+}
+
+impl fmt::Display for BudgetType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tokens => write!(f, "tokens"),
+            Self::TimeMs => write!(f, "time_ms"),
+            Self::CostUsd => write!(f, "cost_usd"),
+            Self::Actions => write!(f, "actions"),
+        }
+    }
+}
+
+/// Metadata attached to every error for observability.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ErrorContext {
+    /// Unique error code (e.g., "POL-001").
+    pub error_code: String,
+    /// Component that generated the error (e.g., "astra-policy").
+    pub component: String,
+    /// Request trace ID for correlation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub correlation_id: Option<String>,
+    /// Error severity level.
+    pub severity: Severity,
+    /// Actionable guidance for resolution.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remediation_hint: Option<String>,
+}
+
+impl Default for ErrorContext {
+    fn default() -> Self {
+        Self {
+            error_code: String::new(),
+            component: String::new(),
+            correlation_id: None,
+            severity: Severity::Error,
+            remediation_hint: None,
+        }
+    }
+}
+
+impl ErrorContext {
+    /// Create a new builder for ErrorContext.
+    pub fn builder() -> ErrorContextBuilder {
+        ErrorContextBuilder::default()
+    }
+}
+
+/// Builder for constructing ErrorContext with validation.
+#[derive(Debug, Default)]
+pub struct ErrorContextBuilder {
+    error_code: Option<String>,
+    component: Option<String>,
+    correlation_id: Option<String>,
+    severity: Severity,
+    remediation_hint: Option<String>,
+}
+
+impl ErrorContextBuilder {
+    /// Set the error code (required).
+    pub fn error_code(mut self, code: impl Into<String>) -> Self {
+        self.error_code = Some(code.into());
+        self
+    }
+
+    /// Set the component name (required).
+    pub fn component(mut self, component: impl Into<String>) -> Self {
+        self.component = Some(component.into());
+        self
+    }
+
+    /// Set the correlation ID for request tracing.
+    pub fn correlation_id(mut self, id: impl Into<String>) -> Self {
+        self.correlation_id = Some(id.into());
+        self
+    }
+
+    /// Set the severity level.
+    pub fn severity(mut self, severity: Severity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    /// Set an actionable remediation hint.
+    pub fn remediation_hint(mut self, hint: impl Into<String>) -> Self {
+        self.remediation_hint = Some(hint.into());
+        self
+    }
+
+    /// Build the ErrorContext. Returns None if required fields are missing.
+    pub fn build(self) -> Option<ErrorContext> {
+        Some(ErrorContext {
+            error_code: self.error_code?,
+            component: self.component?,
+            correlation_id: self.correlation_id,
+            severity: self.severity,
+            remediation_hint: self.remediation_hint,
+        })
+    }
+}
+
+/// Unified error type for all ASTRA_ operations.
+///
+/// Each variant carries full context for debugging and observability.
+/// Display format: `[ASTRA-{CODE}] {message}` for grep-friendly logs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[allow(missing_docs)] // Variant fields documented at variant level
+pub enum AstraError {
+    /// Action blocked by policy rules.
+    ///
+    /// Fields: `context`, `policy_id`, `action`, `reason`
+    PolicyDenied {
+        context: ErrorContext,
+        policy_id: String,
+        action: String,
+        reason: String,
+    },
+
+    /// Resource budget limit exceeded.
+    ///
+    /// Fields: `context`, `budget_type`, `limit`, `used`
+    BudgetExceeded {
+        context: ErrorContext,
+        budget_type: BudgetType,
+        limit: u64,
+        used: u64,
+    },
+
+    /// Operation attempted outside sandbox permissions.
+    ///
+    /// Fields: `context`, `sandbox_tier`, `attempted_action`, `allowed_actions`
+    SandboxViolation {
+        context: ErrorContext,
+        sandbox_tier: u8,
+        attempted_action: String,
+        allowed_actions: Vec<String>,
+    },
+
+    /// Capability input/output doesn't match contract.
+    ///
+    /// Fields: `context`, `capability_id`, `expected`, `actual`
+    ContractMismatch {
+        context: ErrorContext,
+        capability_id: String,
+        expected: String,
+        actual: String,
+    },
+
+    /// Backend service unavailable.
+    ///
+    /// Fields: `context`, `backend_type`, `backend_id`, `reason`
+    BackendUnavailable {
+        context: ErrorContext,
+        backend_type: String,
+        backend_id: String,
+        reason: String,
+    },
+
+    /// Model provider returned an error.
+    ///
+    /// Fields: `context`, `provider`, `status_code`, `message`
+    ProviderError {
+        context: ErrorContext,
+        provider: String,
+        status_code: Option<u16>,
+        message: String,
+    },
+
+    /// Input validation failed.
+    ///
+    /// Fields: `context`, `field`, `message`
+    ValidationFailed {
+        context: ErrorContext,
+        field: Option<String>,
+        message: String,
+    },
+
+    /// Resource or state conflict.
+    ///
+    /// Fields: `context`, `resource_type`, `resource_id`, `description`
+    Conflict {
+        context: ErrorContext,
+        resource_type: String,
+        resource_id: String,
+        description: String,
+    },
+}
+
+impl AstraError {
+    /// Extract the error context from any variant.
+    pub fn context(&self) -> &ErrorContext {
+        match self {
+            Self::PolicyDenied { context, .. } => context,
+            Self::BudgetExceeded { context, .. } => context,
+            Self::SandboxViolation { context, .. } => context,
+            Self::ContractMismatch { context, .. } => context,
+            Self::BackendUnavailable { context, .. } => context,
+            Self::ProviderError { context, .. } => context,
+            Self::ValidationFailed { context, .. } => context,
+            Self::Conflict { context, .. } => context,
+        }
+    }
+
+    /// Get the error code for this error.
+    pub fn error_code(&self) -> &str {
+        &self.context().error_code
+    }
+
+    /// Get the severity level for this error.
+    pub fn severity(&self) -> Severity {
+        self.context().severity
+    }
+
+    /// Create a ValidationFailed error from an I/O error.
+    pub fn from_io(err: std::io::Error, component: impl Into<String>) -> Self {
+        Self::ValidationFailed {
+            context: ErrorContext {
+                error_code: "VAL-001".into(),
+                component: component.into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: Some("Check file permissions and path".into()),
+            },
+            field: None,
+            message: err.to_string(),
+        }
+    }
+
+    /// Create a ValidationFailed error from a JSON error.
+    pub fn from_json(err: serde_json::Error, component: impl Into<String>) -> Self {
+        Self::ValidationFailed {
+            context: ErrorContext {
+                error_code: "VAL-002".into(),
+                component: component.into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: Some("Verify JSON structure matches expected schema".into()),
+            },
+            field: None,
+            message: err.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for AstraError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let code = &self.context().error_code;
+        match self {
+            Self::PolicyDenied {
+                policy_id,
+                action,
+                reason,
+                ..
+            } => {
+                write!(
+                    f,
+                    "[ASTRA-{code}] policy '{policy_id}' denied action '{action}': {reason}"
+                )
+            }
+            Self::BudgetExceeded {
+                budget_type,
+                limit,
+                used,
+                ..
+            } => {
+                write!(
+                    f,
+                    "[ASTRA-{code}] {budget_type} budget exceeded: used {used}, limit {limit}"
+                )
+            }
+            Self::SandboxViolation {
+                sandbox_tier,
+                attempted_action,
+                ..
+            } => {
+                write!(
+                    f,
+                    "[ASTRA-{code}] sandbox tier {sandbox_tier} violation: '{attempted_action}' not permitted"
+                )
+            }
+            Self::ContractMismatch {
+                capability_id,
+                expected,
+                actual,
+                ..
+            } => {
+                write!(
+                    f,
+                    "[ASTRA-{code}] contract mismatch for '{capability_id}': expected {expected}, got {actual}"
+                )
+            }
+            Self::BackendUnavailable {
+                backend_type,
+                backend_id,
+                reason,
+                ..
+            } => {
+                write!(
+                    f,
+                    "[ASTRA-{code}] {backend_type} backend '{backend_id}' unavailable: {reason}"
+                )
+            }
+            Self::ProviderError {
+                provider,
+                status_code,
+                message,
+                ..
+            } => {
+                if let Some(http_code) = status_code {
+                    write!(
+                        f,
+                        "[ASTRA-{code}] provider '{provider}' error (HTTP {http_code}): {message}"
+                    )
+                } else {
+                    write!(f, "[ASTRA-{code}] provider '{provider}' error: {message}")
+                }
+            }
+            Self::ValidationFailed { field, message, .. } => {
+                if let Some(field) = field {
+                    write!(
+                        f,
+                        "[ASTRA-{code}] validation failed for '{field}': {message}"
+                    )
+                } else {
+                    write!(f, "[ASTRA-{code}] validation failed: {message}")
+                }
+            }
+            Self::Conflict {
+                resource_type,
+                resource_id,
+                description,
+                ..
+            } => {
+                write!(
+                    f,
+                    "[ASTRA-{code}] conflict on {resource_type} '{resource_id}': {description}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for AstraError {}
+
+/// Convenient Result type alias for ASTRA_ operations.
+pub type Result<T> = std::result::Result<T, AstraError>;
+
+#[cfg(test)]
+#[allow(clippy::panic)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn severity_display() {
+        assert_eq!(Severity::Critical.to_string(), "CRITICAL");
+        assert_eq!(Severity::Error.to_string(), "ERROR");
+        assert_eq!(Severity::Warning.to_string(), "WARNING");
+        assert_eq!(Severity::Info.to_string(), "INFO");
+    }
+
+    #[test]
+    fn severity_default() {
+        assert_eq!(Severity::default(), Severity::Error);
+    }
+
+    #[test]
+    fn budget_type_display() {
+        assert_eq!(BudgetType::Tokens.to_string(), "tokens");
+        assert_eq!(BudgetType::TimeMs.to_string(), "time_ms");
+        assert_eq!(BudgetType::CostUsd.to_string(), "cost_usd");
+        assert_eq!(BudgetType::Actions.to_string(), "actions");
+    }
+
+    #[test]
+    fn error_context_builder() {
+        let Some(ctx) = ErrorContext::builder()
+            .error_code("POL-001")
+            .component("astra-policy")
+            .correlation_id("req-123")
+            .severity(Severity::Critical)
+            .remediation_hint("Check policy configuration")
+            .build()
+        else {
+            panic!("builder should succeed with all required fields");
+        };
+
+        assert_eq!(ctx.error_code, "POL-001");
+        assert_eq!(ctx.component, "astra-policy");
+        assert_eq!(ctx.correlation_id, Some("req-123".into()));
+        assert_eq!(ctx.severity, Severity::Critical);
+        assert_eq!(
+            ctx.remediation_hint,
+            Some("Check policy configuration".into())
+        );
+    }
+
+    #[test]
+    fn error_context_builder_missing_required() {
+        let result = ErrorContext::builder().error_code("POL-001").build();
+        assert!(result.is_none(), "missing component should fail");
+
+        let result = ErrorContext::builder().component("astra-policy").build();
+        assert!(result.is_none(), "missing error_code should fail");
+    }
+
+    #[test]
+    fn policy_denied_display() {
+        let err = AstraError::PolicyDenied {
+            context: ErrorContext {
+                error_code: "POL-001".into(),
+                component: "astra-policy".into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: None,
+            },
+            policy_id: "no-network".into(),
+            action: "http_request".into(),
+            reason: "network access denied in sandbox tier 1".into(),
+        };
+
+        let display = err.to_string();
+        assert!(display.contains("[ASTRA-POL-001]"));
+        assert!(display.contains("no-network"));
+        assert!(display.contains("http_request"));
+    }
+
+    #[test]
+    fn budget_exceeded_display() {
+        let err = AstraError::BudgetExceeded {
+            context: ErrorContext {
+                error_code: "BUD-001".into(),
+                component: "astra-runtime".into(),
+                correlation_id: Some("task-456".into()),
+                severity: Severity::Error,
+                remediation_hint: Some("Request budget increase".into()),
+            },
+            budget_type: BudgetType::Tokens,
+            limit: 10000,
+            used: 12500,
+        };
+
+        let display = err.to_string();
+        assert!(display.contains("[ASTRA-BUD-001]"));
+        assert!(display.contains("tokens"));
+        assert!(display.contains("12500"));
+        assert!(display.contains("10000"));
+    }
+
+    #[test]
+    fn context_extraction() {
+        let err = AstraError::ValidationFailed {
+            context: ErrorContext {
+                error_code: "VAL-001".into(),
+                component: "astra-types".into(),
+                correlation_id: Some("test-id".into()),
+                severity: Severity::Warning,
+                remediation_hint: None,
+            },
+            field: Some("name".into()),
+            message: "cannot be empty".into(),
+        };
+
+        assert_eq!(err.error_code(), "VAL-001");
+        assert_eq!(err.severity(), Severity::Warning);
+        assert_eq!(err.context().component, "astra-types");
+    }
+
+    #[test]
+    fn serialization_roundtrip() {
+        let err = AstraError::ContractMismatch {
+            context: ErrorContext {
+                error_code: "CON-001".into(),
+                component: "astra-capability".into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: Some("Update capability contract".into()),
+            },
+            capability_id: "repo.read".into(),
+            expected: "string".into(),
+            actual: "number".into(),
+        };
+
+        let Ok(json) = serde_json::to_string(&err) else {
+            panic!("serialization should succeed");
+        };
+        let Ok(decoded) = serde_json::from_str::<AstraError>(&json) else {
+            panic!("deserialization should succeed");
+        };
+
+        assert_eq!(err, decoded);
+    }
+
+    #[test]
+    fn from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let err = AstraError::from_io(io_err, "astra-persistence");
+
+        assert_eq!(err.error_code(), "VAL-001");
+        assert!(err.to_string().contains("file not found"));
+    }
+
+    #[test]
+    fn from_json_error() {
+        let Err(json_err) = serde_json::from_str::<String>("not valid json") else {
+            panic!("invalid json should fail to parse");
+        };
+        let err = AstraError::from_json(json_err, "astra-types");
+
+        assert_eq!(err.error_code(), "VAL-002");
+        assert!(err.to_string().contains("validation failed"));
+    }
+
+    #[test]
+    fn severity_serialization() {
+        let Ok(json) = serde_json::to_string(&Severity::Critical) else {
+            panic!("serialization should succeed");
+        };
+        assert_eq!(json, "\"critical\"");
+
+        let Ok(decoded) = serde_json::from_str::<Severity>(&json) else {
+            panic!("deserialization should succeed");
+        };
+        assert_eq!(decoded, Severity::Critical);
+    }
+
+    #[test]
+    fn budget_type_serialization() {
+        let Ok(json) = serde_json::to_string(&BudgetType::CostUsd) else {
+            panic!("serialization should succeed");
+        };
+        assert_eq!(json, "\"cost_usd\"");
+
+        let Ok(decoded) = serde_json::from_str::<BudgetType>(&json) else {
+            panic!("deserialization should succeed");
+        };
+        assert_eq!(decoded, BudgetType::CostUsd);
+    }
+}
