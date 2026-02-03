@@ -41,6 +41,14 @@ pub enum Severity {
 }
 
 impl fmt::Display for Severity {
+    /// Formats the severity as an uppercase ASCII label (`CRITICAL`, `ERROR`, `WARNING`, `INFO`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::error::Severity;
+    /// assert_eq!(format!("{}", Severity::Warning), "WARNING");
+    /// ```
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Critical => write!(f, "CRITICAL"),
@@ -66,6 +74,17 @@ pub enum BudgetType {
 }
 
 impl fmt::Display for BudgetType {
+    /// Formats the `BudgetType` as its lowercase, snake_case identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::error::BudgetType;
+    /// assert_eq!(format!("{}", BudgetType::Tokens), "tokens");
+    /// assert_eq!(format!("{}", BudgetType::TimeMs), "time_ms");
+    /// assert_eq!(format!("{}", BudgetType::CostUsd), "cost_usd");
+    /// assert_eq!(format!("{}", BudgetType::Actions), "actions");
+    /// ```
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Tokens => write!(f, "tokens"),
@@ -94,6 +113,19 @@ pub struct ErrorContext {
 }
 
 impl Default for ErrorContext {
+    /// Creates a default `ErrorContext` with empty `error_code` and `component`, `None` for
+    /// `correlation_id` and `remediation_hint`, and `severity` set to `Severity::Error`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = ErrorContext::default();
+    /// assert_eq!(ctx.error_code, "");
+    /// assert_eq!(ctx.component, "");
+    /// assert_eq!(ctx.correlation_id, None);
+    /// assert_eq!(ctx.remediation_hint, None);
+    /// assert_eq!(ctx.severity, Severity::Error);
+    /// ```
     fn default() -> Self {
         Self {
             error_code: String::new(),
@@ -106,7 +138,21 @@ impl Default for ErrorContext {
 }
 
 impl ErrorContext {
-    /// Create a new builder for ErrorContext.
+    /// Creates a new `ErrorContextBuilder` to construct an `ErrorContext`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = astra_types::error::ErrorContext::builder()
+    ///     .error_code("GEN-000")
+    ///     .component("ingest")
+    ///     .severity(astra_types::error::Severity::Warning)
+    ///     .remediation_hint("Retry the request")
+    ///     .build()
+    ///     .expect("required fields set");
+    /// assert_eq!(ctx.error_code, "GEN-000");
+    /// assert_eq!(ctx.component, "ingest");
+    /// ```
     pub fn builder() -> ErrorContextBuilder {
         ErrorContextBuilder::default()
     }
@@ -123,37 +169,116 @@ pub struct ErrorContextBuilder {
 }
 
 impl ErrorContextBuilder {
-    /// Set the error code (required).
+    /// Sets the builder's error code.
+    ///
+    /// The provided code becomes the `error_code` of the resulting `ErrorContext` and is required
+    /// for `build()` to succeed. Accepts any value convertible to `String` and returns the builder
+    /// to allow method chaining.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = ErrorContext::builder()
+    ///     .error_code("VAL-001")
+    ///     .component("parser")
+    ///     .build()
+    ///     .expect("missing required fields");
+    /// assert_eq!(ctx.error_code, "VAL-001");
+    /// ```
     pub fn error_code(mut self, code: impl Into<String>) -> Self {
         self.error_code = Some(code.into());
         self
     }
 
-    /// Set the component name (required).
+    /// Sets the component name on the builder; this field is required for `build()` to succeed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let b = ErrorContext::builder().error_code("VAL-001").component("auth");
+    /// let ctx = b.build().unwrap();
+    /// assert_eq!(ctx.component, "auth");
+    /// ```
     pub fn component(mut self, component: impl Into<String>) -> Self {
         self.component = Some(component.into());
         self
     }
 
-    /// Set the correlation ID for request tracing.
+    /// Sets the correlation ID used for request tracing and returns the builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = crate::ErrorContext::builder()
+    ///     .error_code("GEN-001")
+    ///     .component("auth")
+    ///     .correlation_id("req-123")
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(ctx.correlation_id.as_deref(), Some("req-123"));
+    /// ```
     pub fn correlation_id(mut self, id: impl Into<String>) -> Self {
         self.correlation_id = Some(id.into());
         self
     }
 
-    /// Set the severity level.
+    /// Set the diagnostic severity for the `ErrorContext` being built.
+    ///
+    /// By default the builder uses `Severity::Error`; calling this overrides that default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::error::{ErrorContext, ErrorContextBuilder, Severity};
+    ///
+    /// let ctx = ErrorContext::builder()
+    ///     .error_code("GEN-001")
+    ///     .component("auth")
+    ///     .severity(Severity::Critical)
+    ///     .build()
+    ///     .expect("required fields set");
+    ///
+    /// assert_eq!(ctx.severity, Severity::Critical);
+    /// ```
     pub fn severity(mut self, severity: Severity) -> Self {
         self.severity = severity;
         self
     }
 
-    /// Set an actionable remediation hint.
+    /// Sets the remediation hint to guide operators or callers and returns the builder for chaining.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = ErrorContext::builder()
+    ///     .error_code("VAL-001")
+    ///     .component("io")
+    ///     .remediation_hint("Check file permissions")
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(ctx.remediation_hint.as_deref(), Some("Check file permissions"));
+    /// ```
     pub fn remediation_hint(mut self, hint: impl Into<String>) -> Self {
         self.remediation_hint = Some(hint.into());
         self
     }
 
-    /// Build the ErrorContext. Returns None if required fields are missing.
+    /// Constructs an ErrorContext when the builder contains the required fields.
+    ///
+    /// Returns `Some(ErrorContext)` when both `error_code` and `component` were set on the builder, otherwise `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = ErrorContext::builder()
+    ///     .error_code("VAL-001")
+    ///     .component("parser")
+    ///     .build()
+    ///     .expect("builder should produce context");
+    /// assert_eq!(ctx.error_code, "VAL-001");
+    /// assert_eq!(ctx.component, "parser");
+    /// ```
     pub fn build(self) -> Option<ErrorContext> {
         Some(ErrorContext {
             error_code: self.error_code?,
@@ -254,7 +379,25 @@ pub enum AstraError {
 }
 
 impl AstraError {
-    /// Extract the error context from any variant.
+    /// Returns a reference to the `ErrorContext` embedded in the error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = ErrorContext::builder()
+    ///     .error_code("GEN-001")
+    ///     .component("auth")
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// let err = AstraError::ValidationFailed {
+    ///     context: ctx,
+    ///     field: Some("email".into()),
+    ///     message: "invalid format".into(),
+    /// };
+    ///
+    /// assert_eq!(err.context().component, "auth");
+    /// ```
     pub fn context(&self) -> &ErrorContext {
         match self {
             Self::PolicyDenied { context, .. } => context,
@@ -268,17 +411,70 @@ impl AstraError {
         }
     }
 
-    /// Get the error code for this error.
+    /// Retrieve the error code from the error's embedded context.
+    ///
+    /// # Returns
+    ///
+    /// `&str` slice containing the error code.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = ErrorContext::builder()
+    ///     .error_code("VAL-001")
+    ///     .component("parser")
+    ///     .build()
+    ///     .unwrap();
+    /// let err = AstraError::ValidationFailed { context: ctx, field: None, message: "invalid".into() };
+    /// assert_eq!(err.error_code(), "VAL-001");
+    /// ```
     pub fn error_code(&self) -> &str {
         &self.context().error_code
     }
 
-    /// Get the severity level for this error.
+    /// Retrieve the diagnostic severity associated with the error.
+    ///
+    /// # Returns
+    ///
+    /// `Severity` for this error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let err = AstraError::ValidationFailed {
+    ///     context: ErrorContext::builder()
+    ///         .error_code("VAL-001")
+    ///         .component("parser")
+    ///         .build()
+    ///         .unwrap(),
+    ///     field: None,
+    ///     message: "io error".into(),
+    /// };
+    /// assert_eq!(err.severity(), Severity::Error);
+    /// ```
     pub fn severity(&self) -> Severity {
         self.context().severity
     }
 
-    /// Create a ValidationFailed error from an I/O error.
+    /// Constructs an `AstraError::ValidationFailed` from an I/O error for the specified component.
+    ///
+    /// The produced error carries a validation error code and a remediation hint appropriate for I/O failures.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io;
+    /// let io_err = io::Error::new(io::ErrorKind::NotFound, "file missing");
+    /// let err = crate::AstraError::from_io(io_err, "storage");
+    /// match err {
+    ///     crate::AstraError::ValidationFailed { context, field: None, message } => {
+    ///         assert_eq!(context.error_code, "VAL-001");
+    ///         assert_eq!(context.component, "storage");
+    ///         assert!(message.contains("file missing"));
+    ///     }
+    ///     _ => panic!("expected ValidationFailed"),
+    /// }
+    /// ```
     pub fn from_io(err: std::io::Error, component: impl Into<String>) -> Self {
         Self::ValidationFailed {
             context: ErrorContext {
@@ -293,7 +489,34 @@ impl AstraError {
         }
     }
 
-    /// Create a ValidationFailed error from a JSON error.
+    /// Constructs an `AstraError::ValidationFailed` from a `serde_json::Error`.
+    ///
+    /// The created error embeds an `ErrorContext` with the error code `VAL-002`,
+    /// severity `Error`, and a remediation hint instructing to verify the JSON
+    /// structure.
+    ///
+    /// # Parameters
+    ///
+    /// - `err`: the JSON parsing error whose message will be used as the validation message.
+    /// - `component`: identifier of the component that produced the error; stored in the error context.
+    ///
+    /// # Returns
+    ///
+    /// An `AstraError::ValidationFailed` containing the JSON error message and an `ErrorContext` with `error_code = "VAL-002"`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let json_err = serde_json::from_str::<serde_json::Value>("invalid").unwrap_err();
+    /// let ae = crate::AstraError::from_json(json_err, "parser");
+    /// match ae {
+    ///     crate::AstraError::ValidationFailed { context, message, .. } => {
+    ///         assert_eq!(context.error_code, "VAL-002");
+    ///         assert!(message.contains("expected value"));
+    ///     }
+    ///     _ => panic!("unexpected variant"),
+    /// }
+    /// ```
     pub fn from_json(err: serde_json::Error, component: impl Into<String>) -> Self {
         Self::ValidationFailed {
             context: ErrorContext {
@@ -310,6 +533,34 @@ impl AstraError {
 }
 
 impl fmt::Display for AstraError {
+    /// Formats an `AstraError` into a compact, grep-friendly, human-readable message.
+    ///
+    /// The output is prefixed with the error code in the form `[ASTRA-{CODE}]` and includes
+    /// variant-specific details (e.g., policy id and action for policy denials, budget type and values
+    /// for budget exceeded, provider and optional HTTP code for provider errors, etc.).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::{AstraError, ErrorContext};
+    ///
+    /// let ctx = ErrorContext::builder()
+    ///     .error_code("VAL-001")
+    ///     .component("validator")
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// let err = AstraError::ValidationFailed {
+    ///     context: ctx,
+    ///     field: Some("email".into()),
+    ///     message: "missing '@'".into(),
+    /// };
+    ///
+    /// let s = format!("{}", err);
+    /// assert!(s.contains("[ASTRA-VAL-001]"));
+    /// assert!(s.contains("validation failed"));
+    /// assert!(s.contains("email"));
+    /// ```
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let code = &self.context().error_code;
         match self {
@@ -532,6 +783,30 @@ mod tests {
         assert_eq!(err.context().component, "astra-types");
     }
 
+    /// Verifies that a `ContractMismatch` error round-trips through JSON serialization.
+    ///
+    /// Serializes an `AstraError::ContractMismatch` to JSON and ensures deserializing produces an equal value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let err = AstraError::ContractMismatch {
+    ///     context: ErrorContext {
+    ///         error_code: "CON-001".into(),
+    ///         component: "astra-capability".into(),
+    ///         correlation_id: None,
+    ///         severity: Severity::Error,
+    ///         remediation_hint: Some("Update capability contract".into()),
+    ///     },
+    ///     capability_id: "repo.read".into(),
+    ///     expected: "string".into(),
+    ///     actual: "number".into(),
+    /// };
+    ///
+    /// let json = serde_json::to_string(&err).unwrap();
+    /// let decoded: AstraError = serde_json::from_str(&json).unwrap();
+    /// assert_eq!(err, decoded);
+    /// ```
     #[test]
     fn serialization_roundtrip() {
         let err = AstraError::ContractMismatch {
