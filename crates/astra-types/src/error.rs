@@ -59,7 +59,7 @@ pub enum BudgetType {
     Tokens,
     /// Wall-clock execution time in milliseconds.
     TimeMs,
-    /// Estimated cost in USD (microdollars for precision).
+    /// Estimated cost in USD.
     CostUsd,
     /// Number of discrete actions taken.
     Actions,
@@ -96,8 +96,8 @@ pub struct ErrorContext {
 impl Default for ErrorContext {
     fn default() -> Self {
         Self {
-            error_code: String::new(),
-            component: String::new(),
+            error_code: "UNKNOWN".into(),
+            component: "unknown".into(),
             correlation_id: None,
             severity: Severity::Error,
             remediation_hint: None,
@@ -511,6 +511,137 @@ mod tests {
         assert!(display.contains("tokens"));
         assert!(display.contains("12500"));
         assert!(display.contains("10000"));
+    }
+
+    #[test]
+    fn sandbox_violation_display() {
+        let err = AstraError::SandboxViolation {
+            context: ErrorContext {
+                error_code: "SBX-001".into(),
+                component: "astra-sandbox".into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: None,
+            },
+            sandbox_tier: 1,
+            attempted_action: "network_connect".into(),
+            allowed_actions: vec!["file_read".into()],
+        };
+
+        let display = err.to_string();
+        assert!(display.contains("[ASTRA-SBX-001]"));
+        assert!(display.contains("tier 1"));
+        assert!(display.contains("network_connect"));
+    }
+
+    #[test]
+    fn contract_mismatch_display() {
+        let err = AstraError::ContractMismatch {
+            context: ErrorContext {
+                error_code: "CON-001".into(),
+                component: "astra-capability".into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: None,
+            },
+            capability_id: "repo.read".into(),
+            expected: "string".into(),
+            actual: "number".into(),
+        };
+
+        let display = err.to_string();
+        assert!(display.contains("[ASTRA-CON-001]"));
+        assert!(display.contains("repo.read"));
+        assert!(display.contains("expected string"));
+        assert!(display.contains("got number"));
+    }
+
+    #[test]
+    fn backend_unavailable_display() {
+        let err = AstraError::BackendUnavailable {
+            context: ErrorContext {
+                error_code: "BAK-001".into(),
+                component: "astra-context".into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: None,
+            },
+            backend_type: "sqlite".into(),
+            backend_id: "main-db".into(),
+            reason: "connection refused".into(),
+        };
+
+        let display = err.to_string();
+        assert!(display.contains("[ASTRA-BAK-001]"));
+        assert!(display.contains("sqlite"));
+        assert!(display.contains("main-db"));
+        assert!(display.contains("connection refused"));
+    }
+
+    #[test]
+    fn provider_error_with_status_display() {
+        let err = AstraError::ProviderError {
+            context: ErrorContext {
+                error_code: "PRV-001".into(),
+                component: "astra-gateway".into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: None,
+            },
+            provider: "openai".into(),
+            status_code: Some(429),
+            message: "rate limited".into(),
+        };
+
+        let display = err.to_string();
+        assert!(display.contains("[ASTRA-PRV-001]"));
+        assert!(display.contains("openai"));
+        assert!(display.contains("HTTP 429"));
+        assert!(display.contains("rate limited"));
+    }
+
+    #[test]
+    fn provider_error_without_status_display() {
+        let err = AstraError::ProviderError {
+            context: ErrorContext {
+                error_code: "PRV-002".into(),
+                component: "astra-gateway".into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: None,
+            },
+            provider: "anthropic".into(),
+            status_code: None,
+            message: "timeout".into(),
+        };
+
+        let display = err.to_string();
+        assert!(display.contains("[ASTRA-PRV-002]"));
+        assert!(display.contains("anthropic"));
+        assert!(!display.contains("HTTP"));
+        assert!(display.contains("timeout"));
+    }
+
+    #[test]
+    fn conflict_display() {
+        let err = AstraError::Conflict {
+            context: ErrorContext {
+                error_code: "CFL-001".into(),
+                component: "astra-persistence".into(),
+                correlation_id: None,
+                severity: Severity::Error,
+                remediation_hint: None,
+            },
+            resource_type: "artifact".into(),
+            resource_id: "art-123".into(),
+            description: "version mismatch".into(),
+        };
+
+        let display = err.to_string();
+        assert!(display.contains("[ASTRA-CFL-001]"));
+        assert!(display.contains("artifact"));
+        assert!(display.contains("art-123"));
+        assert!(display.contains("version mismatch"));
     }
 
     #[test]
