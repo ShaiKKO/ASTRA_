@@ -11,5 +11,7 @@
 //! - Correlation IDs propagate end-to-end.
 
 mod error;
+mod task;
 
 pub use error::{AstraError, BudgetType, ErrorContext, ErrorContextBuilder, Result, Severity};
+pub use task::{Budget, Constraints, TaskEnvelope, TaskEnvelopeBuilder};
