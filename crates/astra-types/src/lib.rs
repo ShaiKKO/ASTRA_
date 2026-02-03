@@ -10,10 +10,6 @@
 //! - Validation-ready schemas.
 //! - Correlation IDs propagate end-to-end.
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_compiles() {
-        // Stub test - implementation pending
-    }
-}
+mod error;
+
+pub use error::{AstraError, BudgetType, ErrorContext, ErrorContextBuilder, Result, Severity};
