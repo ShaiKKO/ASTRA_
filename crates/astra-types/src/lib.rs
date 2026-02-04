@@ -30,6 +30,7 @@
 
 mod error;
 mod id;
+mod model;
 mod sensitive;
 mod task;
 mod time;
@@ -45,6 +46,9 @@ pub use error::{
 pub use id::{
     ArtifactId, CapabilityId, ContextId, CorrelationId, PolicyId, TaskId, WorkspaceId,
     CAPABILITY_ID_MAX_LEN, POLICY_ID_MAX_LEN, WORKSPACE_ID_MAX_LEN,
+};
+pub use model::{
+    InferenceParams, Message, ModelInvocation, ModelResult, Role, StopReason, Tool, ToolCall, Usage,
 };
 pub use sensitive::Sensitive;
 pub use task::{Budget, Constraints, TaskEnvelope, TaskEnvelopeBuilder};
