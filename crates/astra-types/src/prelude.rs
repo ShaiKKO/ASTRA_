@@ -40,3 +40,8 @@ pub use crate::validate::Validate;
 
 // Wrappers
 pub use crate::sensitive::Sensitive;
+
+// Model types
+pub use crate::model::{
+    InferenceParams, Message, ModelInvocation, ModelResult, Role, StopReason, Tool, ToolCall, Usage,
+};
