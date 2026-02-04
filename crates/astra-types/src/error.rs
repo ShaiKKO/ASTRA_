@@ -26,6 +26,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;
 
+use crate::id::CorrelationId;
+
 /// Type alias for error sources that can be sent across threads.
 pub type BoxedError = Arc<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -90,9 +92,9 @@ pub struct ErrorContext {
     pub error_code: String,
     /// Component that generated the error (e.g., "astra-policy").
     pub component: String,
-    /// Request trace ID for correlation.
+    /// Request trace ID for correlation (UUID format).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub correlation_id: Option<String>,
+    pub correlation_id: Option<CorrelationId>,
     /// Error severity level.
     pub severity: Severity,
     /// Actionable guidance for resolution.
@@ -128,7 +130,7 @@ impl ErrorContext {
 pub struct ErrorContextBuilder {
     error_code: Option<String>,
     component: Option<String>,
-    correlation_id: Option<String>,
+    correlation_id: Option<CorrelationId>,
     severity: Severity,
     remediation_hint: Option<String>,
     source: Option<BoxedError>,
@@ -161,8 +163,8 @@ impl ErrorContextBuilder {
     }
 
     /// Set the correlation ID for request tracing.
-    pub fn correlation_id(mut self, id: impl Into<String>) -> Self {
-        self.correlation_id = Some(id.into());
+    pub fn correlation_id(mut self, id: CorrelationId) -> Self {
+        self.correlation_id = Some(id);
         self
     }
 
@@ -490,10 +492,11 @@ mod tests {
 
     #[test]
     fn error_context_builder() {
+        let corr_id = CorrelationId::new();
         let Some(ctx) = ErrorContext::builder()
             .error_code("POL-001")
             .component("astra-policy")
-            .correlation_id("req-123")
+            .correlation_id(corr_id)
             .severity(Severity::Critical)
             .remediation_hint("Check policy configuration")
             .build()
@@ -503,7 +506,7 @@ mod tests {
 
         assert_eq!(ctx.error_code, "POL-001");
         assert_eq!(ctx.component, "astra-policy");
-        assert_eq!(ctx.correlation_id, Some("req-123".into()));
+        assert_eq!(ctx.correlation_id, Some(corr_id));
         assert_eq!(ctx.severity, Severity::Critical);
         assert_eq!(
             ctx.remediation_hint,
@@ -568,7 +571,7 @@ mod tests {
             context: ErrorContext {
                 error_code: "BUD-001".into(),
                 component: "astra-runtime".into(),
-                correlation_id: Some("task-456".into()),
+                correlation_id: Some(CorrelationId::new()),
                 severity: Severity::Error,
                 remediation_hint: Some("Request budget increase".into()),
                 source: None,
@@ -728,7 +731,7 @@ mod tests {
             context: ErrorContext {
                 error_code: "VAL-001".into(),
                 component: "astra-types".into(),
-                correlation_id: Some("test-id".into()),
+                correlation_id: Some(CorrelationId::new()),
                 severity: Severity::Warning,
                 remediation_hint: None,
                 source: None,
