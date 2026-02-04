@@ -28,6 +28,7 @@
 //! assert!(task.is_valid());
 //! ```
 
+mod capability;
 mod error;
 mod id;
 mod model;
@@ -41,6 +42,7 @@ mod validate;
 pub mod prelude;
 
 // Re-export all public types at crate root for flexibility
+pub use capability::{CapabilityContract, Safety, SideEffectType, SideEffects, ValidationLevel};
 pub use error::{
     AstraError, BoxedError, BudgetType, ErrorContext, ErrorContextBuilder, Result, Severity,
 };

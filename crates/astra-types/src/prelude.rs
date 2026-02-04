@@ -32,6 +32,11 @@ pub use crate::id::{
     ArtifactId, CapabilityId, ContextId, CorrelationId, PolicyId, TaskId, WorkspaceId,
 };
 
+// Capability types
+pub use crate::capability::{
+    CapabilityContract, Safety, SideEffectType, SideEffects, ValidationLevel,
+};
+
 // Time
 pub use crate::time::Timestamp;
 
