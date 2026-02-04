@@ -45,3 +45,6 @@ pub use crate::sensitive::Sensitive;
 pub use crate::model::{
     InferenceParams, Message, ModelInvocation, ModelResult, Role, StopReason, Tool, ToolCall, Usage,
 };
+
+// Outcome types
+pub use crate::outcome::{Outcome, OutcomeError, OutcomeMetrics, OutcomeStatus};

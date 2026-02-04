@@ -31,6 +31,7 @@
 mod error;
 mod id;
 mod model;
+mod outcome;
 mod sensitive;
 mod task;
 mod time;
@@ -50,6 +51,7 @@ pub use id::{
 pub use model::{
     InferenceParams, Message, ModelInvocation, ModelResult, Role, StopReason, Tool, ToolCall, Usage,
 };
+pub use outcome::{Outcome, OutcomeError, OutcomeMetrics, OutcomeStatus};
 pub use sensitive::Sensitive;
 pub use task::{Budget, Constraints, TaskEnvelope, TaskEnvelopeBuilder};
 pub use time::Timestamp;
