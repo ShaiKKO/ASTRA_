@@ -76,6 +76,30 @@ impl Default for Budget {
     }
 }
 
+impl Budget {
+    /// Validate budget values are sensible.
+    #[allow(clippy::result_large_err)]
+    pub fn validate(&self) -> Result<(), AstraError> {
+        if !self.cost_usd.is_finite() || self.cost_usd < 0.0 {
+            return Err(AstraError::ValidationFailed {
+                context: ErrorContext::builder()
+                    .error_code("VAL-014")
+                    .component("astra-types")
+                    .severity(Severity::Error)
+                    .remediation_hint("cost_usd must be a non-negative finite number")
+                    .build()
+                    .unwrap_or_default(),
+                field: Some("cost_usd".into()),
+                message: format!(
+                    "Invalid cost_usd value: {} (must be >= 0 and finite)",
+                    self.cost_usd
+                ),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Security constraints for task execution.
 ///
 /// Follows default-deny: egress is disabled and scopes are empty unless
@@ -145,82 +169,48 @@ impl TaskEnvelope {
     #[allow(clippy::result_large_err)]
     pub fn validate(&self) -> Result<(), AstraError> {
         if self.id.is_empty() {
-            let Some(ctx) = ErrorContext::builder()
-                .error_code("VAL-010")
-                .component("astra-types")
-                .severity(Severity::Error)
-                .remediation_hint("Provide a non-empty task ID")
-                .build()
-            else {
-                return Err(validation_error(None, "Failed to build error context"));
-            };
-            return Err(AstraError::ValidationFailed {
-                context: ctx,
-                field: Some("id".into()),
-                message: "Task ID cannot be empty".into(),
-            });
+            return Err(field_empty_error(
+                "VAL-010",
+                "id",
+                "Task ID cannot be empty",
+            ));
         }
-
         if self.task_type.is_empty() {
-            let Some(ctx) = ErrorContext::builder()
-                .error_code("VAL-011")
-                .component("astra-types")
-                .severity(Severity::Error)
-                .remediation_hint("Provide a task type for routing (e.g., 'implement', 'review')")
-                .build()
-            else {
-                return Err(validation_error(None, "Failed to build error context"));
-            };
-            return Err(AstraError::ValidationFailed {
-                context: ctx,
-                field: Some("type".into()),
-                message: "Task type cannot be empty".into(),
-            });
+            return Err(field_empty_error(
+                "VAL-011",
+                "type",
+                "Task type cannot be empty",
+            ));
         }
-
         if self.goal.is_empty() {
-            let Some(ctx) = ErrorContext::builder()
-                .error_code("VAL-012")
-                .component("astra-types")
-                .severity(Severity::Error)
-                .remediation_hint("Provide a goal describing what should be accomplished")
-                .build()
-            else {
-                return Err(validation_error(None, "Failed to build error context"));
-            };
-            return Err(AstraError::ValidationFailed {
-                context: ctx,
-                field: Some("goal".into()),
-                message: "Task goal cannot be empty".into(),
-            });
+            return Err(field_empty_error(
+                "VAL-012",
+                "goal",
+                "Task goal cannot be empty",
+            ));
         }
-
         if self.workspace.is_empty() {
-            let Some(ctx) = ErrorContext::builder()
-                .error_code("VAL-013")
-                .component("astra-types")
-                .severity(Severity::Error)
-                .remediation_hint("Provide a workspace identifier")
-                .build()
-            else {
-                return Err(validation_error(None, "Failed to build error context"));
-            };
-            return Err(AstraError::ValidationFailed {
-                context: ctx,
-                field: Some("workspace".into()),
-                message: "Workspace cannot be empty".into(),
-            });
+            return Err(field_empty_error(
+                "VAL-013",
+                "workspace",
+                "Workspace cannot be empty",
+            ));
         }
-
+        self.budget.validate()?;
         Ok(())
     }
 }
 
-/// Helper to create a basic validation error.
-fn validation_error(field: Option<&str>, message: &str) -> AstraError {
+/// Helper to create a validation error for empty/missing fields.
+fn field_empty_error(code: &str, field: &str, message: &str) -> AstraError {
     AstraError::ValidationFailed {
-        context: ErrorContext::default(),
-        field: field.map(String::from),
+        context: ErrorContext::builder()
+            .error_code(code)
+            .component("astra-types")
+            .severity(Severity::Error)
+            .build()
+            .unwrap_or_default(),
+        field: Some(field.into()),
         message: message.into(),
     }
 }
@@ -290,61 +280,22 @@ impl TaskEnvelopeBuilder {
     /// Build the TaskEnvelope, returning error if required fields are missing.
     #[allow(clippy::result_large_err)]
     pub fn build(self) -> Result<TaskEnvelope, AstraError> {
-        let id = self.id.ok_or_else(|| {
-            let ctx = ErrorContext::builder()
-                .error_code("VAL-020")
-                .component("astra-types")
-                .severity(Severity::Error)
-                .remediation_hint("Call .id() on the builder")
-                .build();
-            AstraError::ValidationFailed {
-                context: ctx.unwrap_or_default(),
-                field: Some("id".into()),
-                message: "TaskEnvelope requires an id".into(),
-            }
-        })?;
+        // Use same error codes as validate() for consistency
+        let id = self
+            .id
+            .ok_or_else(|| field_empty_error("VAL-010", "id", "Task ID is required"))?;
+        let task_type = self
+            .task_type
+            .ok_or_else(|| field_empty_error("VAL-011", "type", "Task type is required"))?;
+        let goal = self
+            .goal
+            .ok_or_else(|| field_empty_error("VAL-012", "goal", "Task goal is required"))?;
+        let workspace = self
+            .workspace
+            .ok_or_else(|| field_empty_error("VAL-013", "workspace", "Workspace is required"))?;
 
-        let task_type = self.task_type.ok_or_else(|| {
-            let ctx = ErrorContext::builder()
-                .error_code("VAL-021")
-                .component("astra-types")
-                .severity(Severity::Error)
-                .remediation_hint("Call .task_type() on the builder")
-                .build();
-            AstraError::ValidationFailed {
-                context: ctx.unwrap_or_default(),
-                field: Some("type".into()),
-                message: "TaskEnvelope requires a type".into(),
-            }
-        })?;
-
-        let goal = self.goal.ok_or_else(|| {
-            let ctx = ErrorContext::builder()
-                .error_code("VAL-022")
-                .component("astra-types")
-                .severity(Severity::Error)
-                .remediation_hint("Call .goal() on the builder")
-                .build();
-            AstraError::ValidationFailed {
-                context: ctx.unwrap_or_default(),
-                field: Some("goal".into()),
-                message: "TaskEnvelope requires a goal".into(),
-            }
-        })?;
-
-        let workspace = self.workspace.ok_or_else(|| {
-            let ctx = ErrorContext::builder()
-                .error_code("VAL-023")
-                .component("astra-types")
-                .severity(Severity::Error)
-                .remediation_hint("Call .workspace() on the builder")
-                .build();
-            AstraError::ValidationFailed {
-                context: ctx.unwrap_or_default(),
-                field: Some("workspace".into()),
-                message: "TaskEnvelope requires a workspace".into(),
-            }
-        })?;
+        // Validate budget before constructing
+        self.budget.validate()?;
 
         let envelope = TaskEnvelope {
             id,
@@ -357,6 +308,7 @@ impl TaskEnvelopeBuilder {
             constraints: self.constraints,
         };
 
+        // Final validation catches empty strings (e.g., .id(""))
         envelope.validate()?;
         Ok(envelope)
     }
@@ -482,6 +434,116 @@ mod tests {
         };
 
         let result = task.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { field, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(field, Some("id".into()));
+    }
+
+    #[test]
+    fn validate_empty_type() {
+        let task = TaskEnvelope {
+            id: "task-001".into(),
+            task_type: String::new(),
+            goal: "Add validation".into(),
+            workspace: "my-project".into(),
+            context_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            budget: Budget::default(),
+            constraints: Constraints::default(),
+        };
+
+        let result = task.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { field, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(field, Some("type".into()));
+    }
+
+    #[test]
+    fn validate_empty_goal() {
+        let task = TaskEnvelope {
+            id: "task-001".into(),
+            task_type: "implement".into(),
+            goal: String::new(),
+            workspace: "my-project".into(),
+            context_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            budget: Budget::default(),
+            constraints: Constraints::default(),
+        };
+
+        let result = task.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { field, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(field, Some("goal".into()));
+    }
+
+    #[test]
+    fn validate_empty_workspace() {
+        let task = TaskEnvelope {
+            id: "task-001".into(),
+            task_type: "implement".into(),
+            goal: "Add validation".into(),
+            workspace: String::new(),
+            context_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            budget: Budget::default(),
+            constraints: Constraints::default(),
+        };
+
+        let result = task.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { field, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(field, Some("workspace".into()));
+    }
+
+    #[test]
+    fn validate_negative_cost() {
+        let budget = Budget {
+            tokens: 100_000,
+            time_ms: 300_000,
+            cost_usd: -1.0,
+            max_actions: 100,
+        };
+
+        let result = budget.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { field, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(field, Some("cost_usd".into()));
+    }
+
+    #[test]
+    fn validate_nan_cost() {
+        let budget = Budget {
+            tokens: 100_000,
+            time_ms: 300_000,
+            cost_usd: f64::NAN,
+            max_actions: 100,
+        };
+
+        let result = budget.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_infinite_cost() {
+        let budget = Budget {
+            tokens: 100_000,
+            time_ms: 300_000,
+            cost_usd: f64::INFINITY,
+            max_actions: 100,
+        };
+
+        let result = budget.validate();
         assert!(result.is_err());
     }
 
