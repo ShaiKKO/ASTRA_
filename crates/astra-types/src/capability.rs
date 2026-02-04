@@ -1,60 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Capability contract types for ASTRA_.
 //!
-//! This module defines the `CapabilityContract` and related types that specify
-//! what a capability does. Contracts are the "type system" for capabilities -
-//! they enable verification of composition, conflict detection, and policy
-//! enforcement.
+//! Formal specifications for what capabilities do, enabling composition
+//! verification, conflict detection, and policy enforcement.
 //!
-//! # Design
-//!
-//! - `CapabilityContract` defines inputs, outputs, side effects, and safety constraints
-//! - `SideEffects` declares what state modifications a capability may perform
-//! - `Safety` specifies pre/post conditions and potential error classes
-//! - `ValidationLevel` indicates the trust tier of the contract
-//!
-//! # Example
-//!
-//! ```
-//! use astra_types::{
-//!     CapabilityContract, CapabilityId, SideEffects, SideEffectType,
-//!     Safety, ValidationLevel, Validate,
-//! };
-//! use serde_json::json;
-//!
-//! let contract = CapabilityContract::new(
-//!     CapabilityId::new("repo.apply_patch").unwrap(),
-//!     "Apply Patch",
-//!     "1.0.0",
-//! )
-//! .with_taxonomy("repo.write")
-//! .with_inputs(json!({
-//!     "type": "object",
-//!     "properties": {
-//!         "patch": { "type": "string" }
-//!     },
-//!     "required": ["patch"]
-//! }))
-//! .with_outputs(json!({
-//!     "type": "object",
-//!     "properties": {
-//!         "commit_sha": { "type": "string" }
-//!     }
-//! }))
-//! .with_side_effects(SideEffects {
-//!     effects: vec![SideEffectType::FileWrite, SideEffectType::RepoWrite],
-//!     scope: vec!["src/**".into()],
-//! })
-//! .with_safety(Safety::new(
-//!     vec!["worktree.is_clean()".into()],
-//!     vec!["commit.exists(output.commit_sha)".into()],
-//!     vec!["MergeConflict".into()],
-//! ))
-//! .with_validation_level(ValidationLevel::RuntimeVerified);
-//!
-//! assert!(contract.is_valid());
-//! assert!(!contract.is_pure());
-//! ```
+//! - [`CapabilityContract`] - Full capability specification
+//! - [`SideEffects`] - Declared state modifications with scope
+//! - [`SideEffectType`] - Categories of effects (read, write, network, etc.)
+//! - [`Safety`] - Pre/post conditions and error classes
+//! - [`ValidationLevel`] - Trust tiers (declared, verified, audited)
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -68,10 +22,7 @@ use crate::validate::Validate;
 // SideEffectType enum
 // ============================================================================
 
-/// Types of side effects a capability can have.
-///
-/// Side effects indicate what state modifications a capability may perform.
-/// This is used for conflict detection, sandbox enforcement, and policy evaluation.
+/// Categories of side effects a capability may have.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SideEffectType {
@@ -90,15 +41,17 @@ pub enum SideEffectType {
 }
 
 impl SideEffectType {
-    /// Returns true if this effect type modifies state.
+    /// Returns true if this effect modifies local state.
     ///
-    /// Write effects are: FileWrite, RepoWrite, DbWrite.
-    /// These are relevant for conflict detection during parallel execution.
+    /// Only effects that directly mutate locally-scoped state are writes.
+    /// Network and ProcessSpawn are excluded because their mutations occur
+    /// in external systems - conflict detection is delegated to policy.
     pub fn is_write(&self) -> bool {
         matches!(self, Self::FileWrite | Self::RepoWrite | Self::DbWrite)
     }
 }
 
+// Display uses underscores for readability; serde uses lowercase per blueprint §6.1.
 impl fmt::Display for SideEffectType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -116,9 +69,7 @@ impl fmt::Display for SideEffectType {
 // ValidationLevel enum
 // ============================================================================
 
-/// Level of contract validation/trust.
-///
-/// Higher levels indicate more rigorous verification of the contract's claims.
+/// Trust level of a capability contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationLevel {
@@ -150,10 +101,7 @@ impl fmt::Display for ValidationLevel {
 // Safety struct
 // ============================================================================
 
-/// Safety constraints for a capability.
-///
-/// Defines conditions that must hold before/after execution and
-/// what error types the capability may produce.
+/// Pre/post conditions and error classes for a capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Safety {
     /// Conditions that must be true before execution.
@@ -215,29 +163,25 @@ impl Safety {
 // SideEffects struct
 // ============================================================================
 
-/// Declared side effects of a capability.
-///
-/// Specifies what types of effects the capability may cause and
-/// the scopes (paths, endpoints, etc.) where those effects are allowed.
+/// Declared side effects with scoped boundaries.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct SideEffects {
-    /// Types of effects this capability may cause.
+    /// Effect types this capability may cause.
     #[serde(default)]
     pub effects: Vec<SideEffectType>,
 
-    /// Scopes/paths where effects are allowed (glob patterns for files,
-    /// endpoints for network, etc.).
+    /// Scope boundaries (paths, endpoints, tables, etc.).
     #[serde(default)]
     pub scope: Vec<String>,
 }
 
 impl SideEffects {
-    /// Create empty side effects (pure capability).
+    /// Create empty side effects (pure).
     pub fn none() -> Self {
         Self::default()
     }
 
-    /// Create side effects for file reading.
+    /// Create file read effects.
     pub fn file_read(paths: Vec<String>) -> Self {
         Self {
             effects: vec![SideEffectType::FileRead],
@@ -245,7 +189,7 @@ impl SideEffects {
         }
     }
 
-    /// Create side effects for file writing.
+    /// Create file write effects.
     pub fn file_write(paths: Vec<String>) -> Self {
         Self {
             effects: vec![SideEffectType::FileWrite],
@@ -253,7 +197,7 @@ impl SideEffects {
         }
     }
 
-    /// Create side effects for network access.
+    /// Create network access effects.
     pub fn network(endpoints: Vec<String>) -> Self {
         Self {
             effects: vec![SideEffectType::Network],
@@ -261,7 +205,7 @@ impl SideEffects {
         }
     }
 
-    /// Create side effects for process spawning.
+    /// Create process spawn effects.
     pub fn process_spawn(commands: Vec<String>) -> Self {
         Self {
             effects: vec![SideEffectType::ProcessSpawn],
@@ -269,7 +213,7 @@ impl SideEffects {
         }
     }
 
-    /// Create side effects for repository writes.
+    /// Create repository write effects.
     pub fn repo_write(paths: Vec<String>) -> Self {
         Self {
             effects: vec![SideEffectType::RepoWrite],
@@ -277,7 +221,7 @@ impl SideEffects {
         }
     }
 
-    /// Create side effects for database writes.
+    /// Create database write effects.
     pub fn db_write(tables: Vec<String>) -> Self {
         Self {
             effects: vec![SideEffectType::DbWrite],
@@ -285,27 +229,32 @@ impl SideEffects {
         }
     }
 
-    /// Returns true if this capability has no side effects (pure).
+    /// Returns true if no effects are declared.
     pub fn is_pure(&self) -> bool {
         self.effects.is_empty()
     }
 
-    /// Returns true if any effect is a write effect.
+    /// Returns true if any effect is a write.
     pub fn has_writes(&self) -> bool {
         self.effects.iter().any(|e| e.is_write())
     }
 
-    /// Check if this side effects specification overlaps with another.
+    /// Check if these effects conflict with another for parallel execution.
     ///
-    /// Overlap is detected when both have write effects and their scopes
-    /// have potential conflicts (one is a prefix of the other or equal).
-    pub fn overlaps_with(&self, other: &SideEffects) -> bool {
-        // Only write-write conflicts matter
-        if !self.has_writes() || !other.has_writes() {
+    /// Conflicts occur when at least one has writes and scopes overlap.
+    /// Read-read operations do not conflict.
+    pub fn conflicts_with(&self, other: &SideEffects) -> bool {
+        // No conflict if either is pure
+        if self.is_pure() || other.is_pure() {
             return false;
         }
 
-        // Check scope overlap using prefix matching
+        // Read-read: no conflict
+        if !self.has_writes() && !other.has_writes() {
+            return false;
+        }
+
+        // At least one writes - check scope overlap
         for s1 in &self.scope {
             for s2 in &other.scope {
                 if scopes_overlap(s1, s2) {
@@ -318,11 +267,7 @@ impl SideEffects {
     }
 }
 
-/// Check if two scope patterns potentially overlap.
-///
-/// Uses prefix-based matching: scopes overlap if one is a prefix of the other
-/// or they are equal. This is conservative - it may report false positives
-/// but will not miss true conflicts.
+/// Check if two scopes potentially overlap (prefix match, conservative).
 fn scopes_overlap(a: &str, b: &str) -> bool {
     a == b || a.starts_with(b) || b.starts_with(a)
 }
@@ -332,13 +277,9 @@ fn scopes_overlap(a: &str, b: &str) -> bool {
 // ============================================================================
 
 /// Formal contract specifying what a capability does.
-///
-/// A capability contract declares the inputs, outputs, side effects,
-/// resource requirements, and safety constraints of a capability.
-/// This enables static verification of composition before runtime.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CapabilityContract {
-    /// Unique identifier (e.g., "repo.apply_patch").
+    /// Unique identifier.
     pub id: CapabilityId,
 
     /// Human-readable name.
@@ -347,21 +288,21 @@ pub struct CapabilityContract {
     /// Semantic version.
     pub version: String,
 
-    /// Taxonomy category (e.g., "file.write", "analysis.static").
+    /// Taxonomy category.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taxonomy: Option<String>,
 
-    /// JSON Schema for input parameters.
+    /// JSON Schema for inputs.
     pub inputs: Value,
 
-    /// JSON Schema for output.
+    /// JSON Schema for outputs.
     pub outputs: Value,
 
     /// Declared side effects.
     #[serde(default)]
     pub side_effects: SideEffects,
 
-    /// Required resources (e.g., "gpu", "network:api.example.com").
+    /// Required resources.
     #[serde(default)]
     pub resources: Vec<String>,
 
@@ -369,23 +310,17 @@ pub struct CapabilityContract {
     #[serde(default)]
     pub safety: Safety,
 
-    /// Validation/trust level.
+    /// Trust level.
     #[serde(default)]
     pub validation_level: ValidationLevel,
 
-    /// Origin/author of this capability.
+    /// Origin/author.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provenance: Option<String>,
 }
 
 impl CapabilityContract {
     /// Create a new contract with required fields.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Unique capability identifier
-    /// * `name` - Human-readable name
-    /// * `version` - Semantic version string
     pub fn new(id: CapabilityId, name: impl Into<String>, version: impl Into<String>) -> Self {
         Self {
             id,
@@ -402,19 +337,19 @@ impl CapabilityContract {
         }
     }
 
-    /// Set the taxonomy category.
+    /// Set the taxonomy.
     pub fn with_taxonomy(mut self, taxonomy: impl Into<String>) -> Self {
         self.taxonomy = Some(taxonomy.into());
         self
     }
 
-    /// Set the input JSON Schema.
+    /// Set the inputs schema.
     pub fn with_inputs(mut self, inputs: Value) -> Self {
         self.inputs = inputs;
         self
     }
 
-    /// Set the output JSON Schema.
+    /// Set the outputs schema.
     pub fn with_outputs(mut self, outputs: Value) -> Self {
         self.outputs = outputs;
         self
@@ -426,7 +361,7 @@ impl CapabilityContract {
         self
     }
 
-    /// Set the required resources.
+    /// Set the resources.
     pub fn with_resources(mut self, resources: Vec<String>) -> Self {
         self.resources = resources;
         self
@@ -451,13 +386,11 @@ impl CapabilityContract {
     }
 
     /// Check if this contract conflicts with another for parallel execution.
-    ///
-    /// Contracts conflict if their side effects have overlapping write scopes.
     pub fn conflicts_with(&self, other: &CapabilityContract) -> bool {
-        self.side_effects.overlaps_with(&other.side_effects)
+        self.side_effects.conflicts_with(&other.side_effects)
     }
 
-    /// Check if this capability is pure (no side effects).
+    /// Returns true if this capability has no side effects.
     pub fn is_pure(&self) -> bool {
         self.side_effects.is_pure()
     }
@@ -875,53 +808,60 @@ mod tests {
     }
 
     // ========================================================================
-    // SideEffects overlap tests
+    // SideEffects conflict tests
     // ========================================================================
 
     #[test]
-    fn side_effects_overlaps_with_same_scope() {
+    fn side_effects_conflicts_with_same_scope() {
         let effects1 = SideEffects::file_write(vec!["src/".into()]);
         let effects2 = SideEffects::file_write(vec!["src/".into()]);
-        assert!(effects1.overlaps_with(&effects2));
+        assert!(effects1.conflicts_with(&effects2));
     }
 
     #[test]
-    fn side_effects_overlaps_with_prefix_scope() {
+    fn side_effects_conflicts_with_prefix_scope() {
         let effects1 = SideEffects::file_write(vec!["src/".into()]);
         let effects2 = SideEffects::file_write(vec!["src/lib.rs".into()]);
-        assert!(effects1.overlaps_with(&effects2));
+        assert!(effects1.conflicts_with(&effects2));
     }
 
     #[test]
-    fn side_effects_overlaps_with_disjoint_scopes_false() {
+    fn side_effects_conflicts_with_disjoint_scopes_false() {
         let effects1 = SideEffects::file_write(vec!["src/".into()]);
         let effects2 = SideEffects::file_write(vec!["tests/".into()]);
-        assert!(!effects1.overlaps_with(&effects2));
+        assert!(!effects1.conflicts_with(&effects2));
     }
 
     #[test]
-    fn side_effects_overlaps_with_read_read_false() {
+    fn side_effects_conflicts_with_read_read_false() {
         let effects1 = SideEffects::file_read(vec!["src/".into()]);
         let effects2 = SideEffects::file_read(vec!["src/".into()]);
-        assert!(!effects1.overlaps_with(&effects2));
+        assert!(!effects1.conflicts_with(&effects2));
     }
 
     #[test]
-    fn side_effects_overlaps_with_read_write_false() {
+    fn side_effects_conflicts_with_read_write_true() {
         let effects1 = SideEffects::file_read(vec!["src/".into()]);
         let effects2 = SideEffects::file_write(vec!["src/".into()]);
-        assert!(!effects1.overlaps_with(&effects2));
+        assert!(effects1.conflicts_with(&effects2));
     }
 
     #[test]
-    fn side_effects_overlaps_with_write_write_overlap() {
+    fn side_effects_conflicts_with_write_read_true() {
+        let effects1 = SideEffects::file_write(vec!["src/".into()]);
+        let effects2 = SideEffects::file_read(vec!["src/".into()]);
+        assert!(effects1.conflicts_with(&effects2));
+    }
+
+    #[test]
+    fn side_effects_conflicts_with_write_write_overlap() {
         let effects1 = SideEffects::repo_write(vec!["src/".into()]);
         let effects2 = SideEffects::file_write(vec!["src/main.rs".into()]);
-        assert!(effects1.overlaps_with(&effects2));
+        assert!(effects1.conflicts_with(&effects2));
     }
 
     #[test]
-    fn side_effects_overlaps_with_empty_scopes_false() {
+    fn side_effects_conflicts_with_empty_scopes_false() {
         let effects1 = SideEffects {
             effects: vec![SideEffectType::FileWrite],
             scope: vec![],
@@ -930,32 +870,40 @@ mod tests {
             effects: vec![SideEffectType::FileWrite],
             scope: vec![],
         };
-        assert!(!effects1.overlaps_with(&effects2));
+        assert!(!effects1.conflicts_with(&effects2));
     }
 
     #[test]
-    fn side_effects_overlaps_with_one_empty_scope_false() {
+    fn side_effects_conflicts_with_one_empty_scope_false() {
         let effects1 = SideEffects::file_write(vec!["src/".into()]);
         let effects2 = SideEffects {
             effects: vec![SideEffectType::FileWrite],
             scope: vec![],
         };
-        assert!(!effects1.overlaps_with(&effects2));
+        assert!(!effects1.conflicts_with(&effects2));
     }
 
     #[test]
-    fn scopes_overlap_helper_equal() {
+    fn side_effects_conflicts_with_pure_never_conflicts() {
+        let effects1 = SideEffects::none();
+        let effects2 = SideEffects::file_write(vec!["src/".into()]);
+        assert!(!effects1.conflicts_with(&effects2));
+        assert!(!effects2.conflicts_with(&effects1));
+    }
+
+    #[test]
+    fn scopes_overlap_equal() {
         assert!(scopes_overlap("src/", "src/"));
     }
 
     #[test]
-    fn scopes_overlap_helper_prefix() {
+    fn scopes_overlap_prefix() {
         assert!(scopes_overlap("src/", "src/lib.rs"));
         assert!(scopes_overlap("src/lib.rs", "src/"));
     }
 
     #[test]
-    fn scopes_overlap_helper_disjoint() {
+    fn scopes_overlap_disjoint() {
         assert!(!scopes_overlap("src/", "tests/"));
     }
 
