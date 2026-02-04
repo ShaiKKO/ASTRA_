@@ -40,6 +40,9 @@ pub const CAPABILITY_ID_MAX_LEN: usize = 128;
 /// Maximum length for PolicyId.
 pub const POLICY_ID_MAX_LEN: usize = 128;
 
+/// Maximum length for ProfileId.
+pub const PROFILE_ID_MAX_LEN: usize = 64;
+
 /// Regex pattern for CapabilityId: lowercase alphanumeric with underscores, dot-separated.
 /// Examples: "repo", "repo.read", "static_analysis.lint"
 const CAPABILITY_ID_PATTERN: &str = r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$";
@@ -577,6 +580,15 @@ define_string_id!(
     max_len: POLICY_ID_MAX_LEN
 );
 
+define_string_id!(
+    /// Identifier for an agent profile.
+    ///
+    /// User-provided, validated on construction. Maximum 64 characters.
+    /// Must not be empty or contain leading/trailing whitespace.
+    ProfileId,
+    max_len: PROFILE_ID_MAX_LEN
+);
+
 define_string_id_with_pattern!(
     /// Identifier for a capability.
     ///
@@ -870,6 +882,69 @@ mod tests {
             panic!("valid policy ID should succeed");
         };
         assert_eq!(id.as_str(), "no-network-access");
+    }
+
+    // ========================================================================
+    // ProfileId tests
+    // ========================================================================
+
+    #[test]
+    fn profile_id_valid() {
+        let Ok(id) = ProfileId::new("meta_orchestrator") else {
+            panic!("valid profile ID should succeed");
+        };
+        assert_eq!(id.as_str(), "meta_orchestrator");
+    }
+
+    #[test]
+    fn profile_id_empty_fails() {
+        let result = ProfileId::new("");
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { context, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(context.error_code, "VAL-020");
+    }
+
+    #[test]
+    fn profile_id_too_long_fails() {
+        let long_id = "a".repeat(65);
+        let result = ProfileId::new(long_id);
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { context, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(context.error_code, "VAL-021");
+    }
+
+    #[test]
+    fn profile_id_whitespace_fails() {
+        let result = ProfileId::new("  meta_orchestrator");
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { context, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(context.error_code, "VAL-022");
+    }
+
+    #[test]
+    fn profile_id_serde_roundtrip() {
+        let Ok(id) = ProfileId::new("implementer") else {
+            panic!("valid profile ID should succeed");
+        };
+        let Ok(json) = serde_json::to_string(&id) else {
+            panic!("serialization should succeed");
+        };
+        assert_eq!(json, "\"implementer\"");
+        let Ok(decoded) = serde_json::from_str::<ProfileId>(&json) else {
+            panic!("deserialization should succeed");
+        };
+        assert_eq!(id, decoded);
+    }
+
+    #[test]
+    fn profile_id_max_len() {
+        assert_eq!(ProfileId::max_len(), 64);
     }
 
     // ========================================================================

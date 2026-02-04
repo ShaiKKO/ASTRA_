@@ -29,13 +29,16 @@ pub use crate::task::{Budget, Constraints, TaskEnvelope, TaskEnvelopeBuilder};
 
 // ID types
 pub use crate::id::{
-    ArtifactId, CapabilityId, ContextId, CorrelationId, PolicyId, TaskId, WorkspaceId,
+    ArtifactId, CapabilityId, ContextId, CorrelationId, PolicyId, ProfileId, TaskId, WorkspaceId,
 };
 
 // Capability types
 pub use crate::capability::{
     CapabilityContract, Safety, SideEffectType, SideEffects, ValidationLevel,
 };
+
+// Profile types
+pub use crate::profile::{profiles, AgentProfile, CapabilityRef, SandboxTier};
 
 // Time
 pub use crate::time::Timestamp;
