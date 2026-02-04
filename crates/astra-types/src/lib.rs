@@ -33,6 +33,7 @@ mod error;
 mod id;
 mod model;
 mod outcome;
+mod profile;
 mod sensitive;
 mod task;
 mod time;
@@ -47,13 +48,14 @@ pub use error::{
     AstraError, BoxedError, BudgetType, ErrorContext, ErrorContextBuilder, Result, Severity,
 };
 pub use id::{
-    ArtifactId, CapabilityId, ContextId, CorrelationId, PolicyId, TaskId, WorkspaceId,
-    CAPABILITY_ID_MAX_LEN, POLICY_ID_MAX_LEN, WORKSPACE_ID_MAX_LEN,
+    ArtifactId, CapabilityId, ContextId, CorrelationId, PolicyId, ProfileId, TaskId, WorkspaceId,
+    CAPABILITY_ID_MAX_LEN, POLICY_ID_MAX_LEN, PROFILE_ID_MAX_LEN, WORKSPACE_ID_MAX_LEN,
 };
 pub use model::{
     InferenceParams, Message, ModelInvocation, ModelResult, Role, StopReason, Tool, ToolCall, Usage,
 };
 pub use outcome::{Outcome, OutcomeError, OutcomeMetrics, OutcomeStatus};
+pub use profile::{profiles, AgentProfile, CapabilityRef, SandboxTier};
 pub use sensitive::Sensitive;
 pub use task::{Budget, Constraints, TaskEnvelope, TaskEnvelopeBuilder};
 pub use time::Timestamp;
