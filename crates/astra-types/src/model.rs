@@ -329,18 +329,21 @@ impl Default for InferenceParams {
 
 impl Validate for InferenceParams {
     fn validate(&self) -> Result<(), AstraError> {
-        // VAL-030: temperature must be non-negative
-        if self.temperature < 0.0 {
+        // VAL-030: temperature must be non-negative and finite
+        if !self.temperature.is_finite() || self.temperature < 0.0 {
             return Err(AstraError::ValidationFailed {
                 context: ErrorContext::builder()
                     .error_code("VAL-030")
                     .component("astra-types")
                     .severity(Severity::Error)
-                    .remediation_hint("temperature must be >= 0.0")
+                    .remediation_hint("temperature must be >= 0.0 and finite")
                     .build()
                     .unwrap_or_default(),
                 field: Some("temperature".into()),
-                message: format!("temperature must be non-negative, got {}", self.temperature),
+                message: format!(
+                    "temperature must be non-negative and finite, got {}",
+                    self.temperature
+                ),
             });
         }
 
@@ -769,6 +772,51 @@ mod tests {
     fn inference_params_negative_temperature_fails() {
         let params = InferenceParams {
             temperature: -0.1,
+            ..Default::default()
+        };
+        let result = params.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { context, field, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(context.error_code, "VAL-030");
+        assert_eq!(field, Some("temperature".into()));
+    }
+
+    #[test]
+    fn inference_params_nan_temperature_fails() {
+        let params = InferenceParams {
+            temperature: f32::NAN,
+            ..Default::default()
+        };
+        let result = params.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { context, field, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(context.error_code, "VAL-030");
+        assert_eq!(field, Some("temperature".into()));
+    }
+
+    #[test]
+    fn inference_params_infinity_temperature_fails() {
+        let params = InferenceParams {
+            temperature: f32::INFINITY,
+            ..Default::default()
+        };
+        let result = params.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { context, field, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(context.error_code, "VAL-030");
+        assert_eq!(field, Some("temperature".into()));
+    }
+
+    #[test]
+    fn inference_params_neg_infinity_temperature_fails() {
+        let params = InferenceParams {
+            temperature: f32::NEG_INFINITY,
             ..Default::default()
         };
         let result = params.validate();
