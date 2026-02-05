@@ -7,6 +7,8 @@
 //!
 //! See blueprint §5.2-5.3 for profile catalog and compliance rules.
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AstraError, ErrorContext, Severity};
@@ -47,6 +49,18 @@ impl Default for SandboxTier {
     }
 }
 
+impl fmt::Display for SandboxTier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tier0 => write!(f, "Tier 0 (pure compute)"),
+            Self::Tier1 => write!(f, "Tier 1 (read-only)"),
+            Self::Tier2 => write!(f, "Tier 2 (read/write)"),
+            Self::Tier3 => write!(f, "Tier 3 (network)"),
+            Self::Tier4 => write!(f, "Tier 4 (admin)"),
+        }
+    }
+}
+
 impl SandboxTier {
     /// Returns true if this tier allows write operations.
     pub fn allows_write(&self) -> bool {
@@ -69,7 +83,7 @@ impl SandboxTier {
 // ============================================================================
 
 /// Reference to a capability with optional version constraint.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CapabilityRef {
     /// Capability identifier.
     pub id: CapabilityId,
@@ -261,8 +275,8 @@ impl Validate for AgentProfile {
             });
         }
 
-        // VAL-061: Name cannot be empty
-        if self.name.is_empty() {
+        // VAL-061: Name cannot be empty or whitespace-only
+        if self.name.trim().is_empty() {
             return Err(AstraError::ValidationFailed {
                 context: ErrorContext::builder()
                     .error_code("VAL-061")
@@ -272,12 +286,12 @@ impl Validate for AgentProfile {
                     .build()
                     .unwrap_or_default(),
                 field: Some("name".into()),
-                message: "AgentProfile.name cannot be empty".into(),
+                message: "AgentProfile.name cannot be empty or whitespace-only".into(),
             });
         }
 
-        // VAL-062: Version cannot be empty
-        if self.version.is_empty() {
+        // VAL-062: Version cannot be empty or whitespace-only
+        if self.version.trim().is_empty() {
             return Err(AstraError::ValidationFailed {
                 context: ErrorContext::builder()
                     .error_code("VAL-062")
@@ -287,7 +301,7 @@ impl Validate for AgentProfile {
                     .build()
                     .unwrap_or_default(),
                 field: Some("version".into()),
-                message: "AgentProfile.version cannot be empty".into(),
+                message: "AgentProfile.version cannot be empty or whitespace-only".into(),
             });
         }
 
@@ -502,7 +516,8 @@ mod tests {
     #[test]
     fn sandbox_tier_clone() {
         let tier = SandboxTier::Tier3;
-        let cloned = tier;
+        #[allow(clippy::clone_on_copy)]
+        let cloned = tier.clone();
         assert_eq!(tier, cloned);
     }
 
@@ -540,6 +555,27 @@ mod tests {
         assert!(SandboxTier::Tier2.allows_spawn());
         assert!(SandboxTier::Tier3.allows_spawn());
         assert!(SandboxTier::Tier4.allows_spawn());
+    }
+
+    #[test]
+    fn sandbox_tier_display() {
+        assert_eq!(SandboxTier::Tier0.to_string(), "Tier 0 (pure compute)");
+        assert_eq!(SandboxTier::Tier1.to_string(), "Tier 1 (read-only)");
+        assert_eq!(SandboxTier::Tier2.to_string(), "Tier 2 (read/write)");
+        assert_eq!(SandboxTier::Tier3.to_string(), "Tier 3 (network)");
+        assert_eq!(SandboxTier::Tier4.to_string(), "Tier 4 (admin)");
+    }
+
+    #[test]
+    fn sandbox_tier_invalid_deserialize_fails() {
+        let result = serde_json::from_str::<SandboxTier>("\"tier_5\"");
+        assert!(result.is_err());
+
+        let result = serde_json::from_str::<SandboxTier>("\"invalid\"");
+        assert!(result.is_err());
+
+        let result = serde_json::from_str::<SandboxTier>("\"TIER_0\"");
+        assert!(result.is_err());
     }
 
     // ========================================================================
@@ -642,6 +678,26 @@ mod tests {
         let cap_ref = CapabilityRef::new(id).with_version("^2.0");
         let cloned = cap_ref.clone();
         assert_eq!(cap_ref, cloned);
+    }
+
+    #[test]
+    fn capability_ref_hash_in_set() {
+        use std::collections::HashSet;
+        let Ok(id1) = CapabilityId::new("repo.read") else {
+            panic!("valid capability ID should succeed");
+        };
+        let Ok(id2) = CapabilityId::new("repo.write") else {
+            panic!("valid capability ID should succeed");
+        };
+        let ref1 = CapabilityRef::new(id1.clone());
+        let ref2 = CapabilityRef::new(id2);
+        let ref1_dup = CapabilityRef::new(id1);
+
+        let mut set = HashSet::new();
+        set.insert(ref1);
+        set.insert(ref2);
+        set.insert(ref1_dup); // duplicate
+        assert_eq!(set.len(), 2);
     }
 
     // ========================================================================
@@ -760,6 +816,54 @@ mod tests {
             id: ProfileId::new_unchecked("test"),
             name: "Test".into(),
             version: "".into(),
+            description: None,
+            capabilities: vec![make_test_capability()],
+            default_budget: Budget::default(),
+            sandbox_tier: SandboxTier::default(),
+            input_schema: None,
+            output_artifacts: Vec::new(),
+            tags: Vec::new(),
+            can_spawn_agents: false,
+            max_sub_agents: None,
+        };
+        let result = profile.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { context, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(context.error_code, "VAL-062");
+    }
+
+    #[test]
+    fn agent_profile_validate_whitespace_name_fails() {
+        let profile = AgentProfile {
+            id: ProfileId::new_unchecked("test"),
+            name: "   ".into(),
+            version: "1.0.0".into(),
+            description: None,
+            capabilities: vec![make_test_capability()],
+            default_budget: Budget::default(),
+            sandbox_tier: SandboxTier::default(),
+            input_schema: None,
+            output_artifacts: Vec::new(),
+            tags: Vec::new(),
+            can_spawn_agents: false,
+            max_sub_agents: None,
+        };
+        let result = profile.validate();
+        assert!(result.is_err());
+        let Err(AstraError::ValidationFailed { context, .. }) = result else {
+            panic!("expected ValidationFailed");
+        };
+        assert_eq!(context.error_code, "VAL-061");
+    }
+
+    #[test]
+    fn agent_profile_validate_whitespace_version_fails() {
+        let profile = AgentProfile {
+            id: ProfileId::new_unchecked("test"),
+            name: "Test".into(),
+            version: "   ".into(),
             description: None,
             capabilities: vec![make_test_capability()],
             default_budget: Budget::default(),
