@@ -56,3 +56,9 @@ pub use crate::model::{
 
 // Outcome types
 pub use crate::outcome::{Outcome, OutcomeError, OutcomeMetrics, OutcomeStatus};
+
+// Artifact types
+pub use crate::artifact::{Artifact, ArtifactLinks, ArtifactState};
+
+// Context types
+pub use crate::context::{ContextItem, ContextKind, ContextScope};
