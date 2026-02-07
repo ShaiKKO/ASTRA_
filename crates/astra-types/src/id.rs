@@ -531,6 +531,14 @@ define_uuid_id!(
     ContextId
 );
 
+define_uuid_id!(
+    /// Unique identifier for a policy decision.
+    ///
+    /// Auto-generated as UUID v4. Records each policy evaluation (allow/deny/escalate)
+    /// for audit trail and compliance.
+    DecisionId
+);
+
 // ============================================================================
 // String-based ID types
 // ============================================================================

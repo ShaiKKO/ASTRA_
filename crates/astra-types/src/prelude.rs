@@ -29,7 +29,8 @@ pub use crate::task::{Budget, Constraints, TaskEnvelope, TaskEnvelopeBuilder};
 
 // ID types
 pub use crate::id::{
-    ArtifactId, CapabilityId, ContextId, CorrelationId, PolicyId, ProfileId, TaskId, WorkspaceId,
+    ArtifactId, CapabilityId, ContextId, CorrelationId, DecisionId, PolicyId, ProfileId, TaskId,
+    WorkspaceId,
 };
 
 // Capability types
@@ -62,3 +63,9 @@ pub use crate::artifact::{Artifact, ArtifactLinks, ArtifactState};
 
 // Context types
 pub use crate::context::{ContextItem, ContextKind, ContextScope};
+
+// Policy types
+pub use crate::policy::{PolicyDecision, PolicyEffect, PolicyLevel, PolicySource};
+
+// Report types
+pub use crate::report::{BudgetSnapshot, Intervention, RunReport, TimelineEvent};
