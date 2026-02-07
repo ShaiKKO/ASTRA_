@@ -11,7 +11,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{AstraError, ErrorContext, Severity};
+use crate::error::{AstraError, ErrorContext};
 use crate::id::{CapabilityId, ProfileId};
 use crate::task::Budget;
 use crate::validate::Validate;
@@ -263,13 +263,7 @@ impl Validate for AgentProfile {
         // VAL-060: Profile ID cannot be empty (defense-in-depth for new_unchecked paths)
         if self.id.as_str().is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-060")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a non-empty profile ID")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation("VAL-060", "Provide a non-empty profile ID"),
                 field: Some("id".into()),
                 message: "AgentProfile.id cannot be empty".into(),
             });
@@ -278,13 +272,7 @@ impl Validate for AgentProfile {
         // VAL-061: Name cannot be empty or whitespace-only
         if self.name.trim().is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-061")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a non-empty profile name")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation("VAL-061", "Provide a non-empty profile name"),
                 field: Some("name".into()),
                 message: "AgentProfile.name cannot be empty or whitespace-only".into(),
             });
@@ -293,13 +281,7 @@ impl Validate for AgentProfile {
         // VAL-062: Version cannot be empty or whitespace-only
         if self.version.trim().is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-062")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a non-empty profile version")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation("VAL-062", "Provide a non-empty profile version"),
                 field: Some("version".into()),
                 message: "AgentProfile.version cannot be empty or whitespace-only".into(),
             });
@@ -308,13 +290,10 @@ impl Validate for AgentProfile {
         // VAL-063: Capabilities cannot be empty
         if self.capabilities.is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-063")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Add at least one capability to the profile")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-063",
+                    "Add at least one capability to the profile",
+                ),
                 field: Some("capabilities".into()),
                 message: "AgentProfile must have at least one capability".into(),
             });
@@ -323,15 +302,10 @@ impl Validate for AgentProfile {
         // VAL-064: Spawning requires Tier2+
         if self.can_spawn_agents && !self.sandbox_tier.allows_spawn() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-064")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint(
-                        "Set sandbox_tier to Tier2 or higher, or disable can_spawn_agents",
-                    )
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-064",
+                    "Set sandbox_tier to Tier2 or higher, or disable can_spawn_agents",
+                ),
                 field: Some("can_spawn_agents".into()),
                 message: "can_spawn_agents requires sandbox_tier >= Tier2".into(),
             });
@@ -340,13 +314,10 @@ impl Validate for AgentProfile {
         // VAL-065: max_sub_agents requires can_spawn_agents
         if self.max_sub_agents.is_some() && !self.can_spawn_agents {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-065")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Set can_spawn_agents to true, or remove max_sub_agents")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-065",
+                    "Set can_spawn_agents to true, or remove max_sub_agents",
+                ),
                 field: Some("max_sub_agents".into()),
                 message: "max_sub_agents set but can_spawn_agents is false".into(),
             });

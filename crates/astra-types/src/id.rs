@@ -29,7 +29,7 @@ use std::hash::Hash;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::error::{AstraError, ErrorContext, Severity};
+use crate::error::{AstraError, ErrorContext};
 
 /// Maximum length for WorkspaceId.
 pub const WORKSPACE_ID_MAX_LEN: usize = 256;
@@ -108,16 +108,10 @@ macro_rules! define_uuid_id {
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 Uuid::parse_str(s).map(Self).map_err(|e| {
                     AstraError::ValidationFailed {
-                        context: ErrorContext::builder()
-                            .error_code("VAL-024")
-                            .component("astra-types")
-                            .severity(Severity::Error)
-                            .remediation_hint(format!(
-                                "Provide a valid UUID for {}",
-                                stringify!($name)
-                            ))
-                            .build()
-                            .unwrap_or_default(),
+                        context: ErrorContext::validation(
+                            "VAL-024",
+                            format!("Provide a valid UUID for {}", stringify!($name)),
+                        ),
                         field: Some(stringify!($name).into()),
                         message: format!("Invalid UUID format: {}", e),
                     }
@@ -191,13 +185,10 @@ macro_rules! define_string_id {
             fn validate_string(value: &str) -> Result<(), AstraError> {
                 if value.is_empty() {
                     return Err(AstraError::ValidationFailed {
-                        context: ErrorContext::builder()
-                            .error_code("VAL-020")
-                            .component("astra-types")
-                            .severity(Severity::Error)
-                            .remediation_hint(format!("{} cannot be empty", stringify!($name)))
-                            .build()
-                            .unwrap_or_default(),
+                        context: ErrorContext::validation(
+                            "VAL-020",
+                            format!("{} cannot be empty", stringify!($name)),
+                        ),
                         field: Some(stringify!($name).into()),
                         message: format!("{} cannot be empty", stringify!($name)),
                     });
@@ -205,17 +196,14 @@ macro_rules! define_string_id {
 
                 if value.len() > $max_len {
                     return Err(AstraError::ValidationFailed {
-                        context: ErrorContext::builder()
-                            .error_code("VAL-021")
-                            .component("astra-types")
-                            .severity(Severity::Error)
-                            .remediation_hint(format!(
+                        context: ErrorContext::validation(
+                            "VAL-021",
+                            format!(
                                 "{} must be at most {} characters",
                                 stringify!($name),
                                 $max_len
-                            ))
-                            .build()
-                            .unwrap_or_default(),
+                            ),
+                        ),
                         field: Some(stringify!($name).into()),
                         message: format!(
                             "{} exceeds maximum length of {} (got {})",
@@ -228,16 +216,13 @@ macro_rules! define_string_id {
 
                 if value != value.trim() {
                     return Err(AstraError::ValidationFailed {
-                        context: ErrorContext::builder()
-                            .error_code("VAL-022")
-                            .component("astra-types")
-                            .severity(Severity::Error)
-                            .remediation_hint(format!(
+                        context: ErrorContext::validation(
+                            "VAL-022",
+                            format!(
                                 "{} must not have leading or trailing whitespace",
                                 stringify!($name)
-                            ))
-                            .build()
-                            .unwrap_or_default(),
+                            ),
+                        ),
                         field: Some(stringify!($name).into()),
                         message: format!(
                             "{} contains leading or trailing whitespace",
@@ -358,13 +343,10 @@ macro_rules! define_string_id_with_pattern {
             fn validate_string(value: &str) -> Result<(), AstraError> {
                 if value.is_empty() {
                     return Err(AstraError::ValidationFailed {
-                        context: ErrorContext::builder()
-                            .error_code("VAL-020")
-                            .component("astra-types")
-                            .severity(Severity::Error)
-                            .remediation_hint(format!("{} cannot be empty", stringify!($name)))
-                            .build()
-                            .unwrap_or_default(),
+                        context: ErrorContext::validation(
+                            "VAL-020",
+                            format!("{} cannot be empty", stringify!($name)),
+                        ),
                         field: Some(stringify!($name).into()),
                         message: format!("{} cannot be empty", stringify!($name)),
                     });
@@ -372,17 +354,14 @@ macro_rules! define_string_id_with_pattern {
 
                 if value.len() > $max_len {
                     return Err(AstraError::ValidationFailed {
-                        context: ErrorContext::builder()
-                            .error_code("VAL-021")
-                            .component("astra-types")
-                            .severity(Severity::Error)
-                            .remediation_hint(format!(
+                        context: ErrorContext::validation(
+                            "VAL-021",
+                            format!(
                                 "{} must be at most {} characters",
                                 stringify!($name),
                                 $max_len
-                            ))
-                            .build()
-                            .unwrap_or_default(),
+                            ),
+                        ),
                         field: Some(stringify!($name).into()),
                         message: format!(
                             "{} exceeds maximum length of {} (got {})",
@@ -395,16 +374,13 @@ macro_rules! define_string_id_with_pattern {
 
                 if value != value.trim() {
                     return Err(AstraError::ValidationFailed {
-                        context: ErrorContext::builder()
-                            .error_code("VAL-022")
-                            .component("astra-types")
-                            .severity(Severity::Error)
-                            .remediation_hint(format!(
+                        context: ErrorContext::validation(
+                            "VAL-022",
+                            format!(
                                 "{} must not have leading or trailing whitespace",
                                 stringify!($name)
-                            ))
-                            .build()
-                            .unwrap_or_default(),
+                            ),
+                        ),
                         field: Some(stringify!($name).into()),
                         message: format!(
                             "{} contains leading or trailing whitespace",
@@ -417,17 +393,14 @@ macro_rules! define_string_id_with_pattern {
                 // Pattern: ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$
                 if !Self::matches_pattern(value) {
                     return Err(AstraError::ValidationFailed {
-                        context: ErrorContext::builder()
-                            .error_code("VAL-023")
-                            .component("astra-types")
-                            .severity(Severity::Error)
-                            .remediation_hint(format!(
+                        context: ErrorContext::validation(
+                            "VAL-023",
+                            format!(
                                 "{} must match pattern: {}",
                                 stringify!($name),
                                 $pattern_desc
-                            ))
-                            .build()
-                            .unwrap_or_default(),
+                            ),
+                        ),
                         field: Some(stringify!($name).into()),
                         message: format!(
                             "{} does not match required pattern ({})",

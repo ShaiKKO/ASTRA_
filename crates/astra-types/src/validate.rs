@@ -43,7 +43,7 @@ use crate::AstraError;
 /// # Example
 ///
 /// ```
-/// use astra_types::{AstraError, Validate, ErrorContext, Severity};
+/// use astra_types::{AstraError, Validate, ErrorContext};
 ///
 /// struct Config {
 ///     timeout_ms: u64,
@@ -54,12 +54,10 @@ use crate::AstraError;
 ///     fn validate(&self) -> Result<(), AstraError> {
 ///         if self.timeout_ms == 0 {
 ///             return Err(AstraError::ValidationFailed {
-///                 context: ErrorContext::builder()
-///                     .error_code("VAL-100")
-///                     .component("my-crate")
-///                     .severity(Severity::Error)
-///                     .build()
-///                     .unwrap_or_default(),
+///                 context: ErrorContext::validation(
+///                     "VAL-100",
+///                     "timeout must be greater than 0",
+///                 ),
 ///                 field: Some("timeout_ms".into()),
 ///                 message: "timeout must be greater than 0".into(),
 ///             });
@@ -108,7 +106,7 @@ impl<T: Validate + ?Sized> Validate for Box<T> {
 #[allow(clippy::panic)]
 mod tests {
     use super::*;
-    use crate::{ErrorContext, Severity};
+    use crate::ErrorContext;
 
     struct AlwaysValid;
 
@@ -123,12 +121,7 @@ mod tests {
     impl Validate for AlwaysInvalid {
         fn validate(&self) -> Result<(), AstraError> {
             Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-TEST")
-                    .component("test")
-                    .severity(Severity::Error)
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation("VAL-TEST", "always fails"),
                 field: Some("test_field".into()),
                 message: "always fails".into(),
             })

@@ -123,6 +123,37 @@ impl ErrorContext {
     pub fn builder() -> ErrorContextBuilder {
         ErrorContextBuilder::default()
     }
+
+    /// Create an ErrorContext for validation errors in astra-types.
+    ///
+    /// Why: Eliminates the `builder().build().unwrap_or_default()` pattern
+    /// that silently degrades to "UNKNOWN" error codes on builder misconfiguration.
+    /// This infallible constructor is appropriate when error_code and component
+    /// are known at compile time.
+    ///
+    /// # Arguments
+    /// * `error_code` - The validation error code (e.g., "VAL-070")
+    /// * `remediation_hint` - Actionable guidance for the user
+    ///
+    /// # Example
+    /// ```
+    /// use astra_types::{ErrorContext, Severity};
+    ///
+    /// let ctx = ErrorContext::validation("VAL-070", "Provide a non-empty artifact type");
+    /// assert_eq!(ctx.error_code, "VAL-070");
+    /// assert_eq!(ctx.component, "astra-types");
+    /// assert_eq!(ctx.severity, Severity::Error);
+    /// ```
+    pub fn validation(error_code: impl Into<String>, remediation_hint: impl Into<String>) -> Self {
+        Self {
+            error_code: error_code.into(),
+            component: "astra-types".into(),
+            correlation_id: None,
+            severity: Severity::Error,
+            remediation_hint: Some(remediation_hint.into()),
+            source: None,
+        }
+    }
 }
 
 /// Builder for constructing ErrorContext with validation.

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
 
-use crate::error::{AstraError, ErrorContext, Severity};
+use crate::error::{AstraError, ErrorContext};
 use crate::id::CapabilityId;
 use crate::validate::Validate;
 
@@ -401,13 +401,10 @@ impl Validate for CapabilityContract {
         // VAL-050: name must be non-empty
         if self.name.is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-050")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a non-empty name for the capability")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-050",
+                    "Provide a non-empty name for the capability",
+                ),
                 field: Some("name".into()),
                 message: "CapabilityContract name cannot be empty".into(),
             });
@@ -416,13 +413,10 @@ impl Validate for CapabilityContract {
         // VAL-051: version must be non-empty
         if self.version.is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-051")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a semantic version string (e.g., \"1.0.0\")")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-051",
+                    "Provide a semantic version string (e.g., \"1.0.0\")",
+                ),
                 field: Some("version".into()),
                 message: "CapabilityContract version cannot be empty".into(),
             });
@@ -431,13 +425,10 @@ impl Validate for CapabilityContract {
         // VAL-052: inputs must be a JSON object
         if !self.inputs.is_object() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-052")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a JSON object for inputs (e.g., JSON Schema)")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-052",
+                    "Provide a JSON object for inputs (e.g., JSON Schema)",
+                ),
                 field: Some("inputs".into()),
                 message: format!(
                     "CapabilityContract inputs must be a JSON object, got {}",
@@ -449,13 +440,10 @@ impl Validate for CapabilityContract {
         // VAL-053: outputs must be a JSON object
         if !self.outputs.is_object() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-053")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a JSON object for outputs (e.g., JSON Schema)")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-053",
+                    "Provide a JSON object for outputs (e.g., JSON Schema)",
+                ),
                 field: Some("outputs".into()),
                 message: format!(
                     "CapabilityContract outputs must be a JSON object, got {}",
