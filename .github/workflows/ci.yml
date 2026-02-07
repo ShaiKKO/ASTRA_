@@ -1,0 +1,127 @@
+# ASTRA_ Continuous Integration Pipeline
+#
+# Enforces quality gates from AGENTS.md Section 2:
+#   - cargo fmt --all -- --check
+#   - cargo clippy --all-targets --all-features -- -D warnings
+#   - cargo test --all --all-features
+#   - cargo doc --no-deps --workspace
+#
+# Rust toolchain version is driven by rust-toolchain.toml (currently 1.83).
+# Python jobs (mypy, ruff, black, pytest) deferred until Issue #11 delivers
+# the capabilities/ scaffolding.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # Fast checks: formatting and linting run first.
+  # No point running tests if code doesn't pass lint.
+  # ────────────────────────────────────────────────────────────
+  lint-rust:
+    name: Rust Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # rust-toolchain.toml auto-detected by rustup after checkout.
+      # Installs pinned version (1.83) with rustfmt, clippy, llvm-tools-preview.
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # ────────────────────────────────────────────────────────────
+  # Tests and documentation build.
+  # Depends on lint-rust: skip if code fails lint.
+  # ────────────────────────────────────────────────────────────
+  test-rust:
+    name: Rust Test
+    runs-on: ubuntu-latest
+    needs: lint-rust
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo test --all --all-features --no-fail-fast
+
+      - name: Build documentation
+        run: cargo doc --no-deps --workspace
+
+  # ────────────────────────────────────────────────────────────
+  # Coverage with cargo-llvm-cov.
+  # Runs in parallel with test-rust (both depend on lint-rust).
+  # Uploads to Codecov (non-blocking).
+  #
+  # NOTE: For coverage uploads to appear on PRs, configure the
+  # CODECOV_TOKEN secret in repository settings:
+  #   Settings > Secrets and variables > Actions > New repository secret
+  # ────────────────────────────────────────────────────────────
+  coverage-rust:
+    name: Rust Coverage
+    runs-on: ubuntu-latest
+    needs: lint-rust
+    steps:
+      - uses: actions/checkout@v4
+
+      # llvm-tools-preview is included in rust-toolchain.toml components.
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Generate coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # ────────────────────────────────────────────────────────────
+  # Gate job: single required status check for branch protection.
+  # All upstream jobs must pass for this to succeed.
+  # ────────────────────────────────────────────────────────────
+  ci-pass:
+    name: CI Pass
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint-rust, test-rust, coverage-rust]
+    steps:
+      - name: Verify all checks passed
+        run: |
+          if [[ "${{ needs.lint-rust.result }}" != "success" ]]; then
+            echo "lint-rust failed: ${{ needs.lint-rust.result }}"
+            exit 1
+          fi
+          if [[ "${{ needs.test-rust.result }}" != "success" ]]; then
+            echo "test-rust failed: ${{ needs.test-rust.result }}"
+            exit 1
+          fi
+          if [[ "${{ needs.coverage-rust.result }}" != "success" ]]; then
+            echo "coverage-rust failed: ${{ needs.coverage-rust.result }}"
+            exit 1
+          fi
+          echo "All CI checks passed."
