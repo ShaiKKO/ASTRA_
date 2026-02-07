@@ -13,7 +13,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::error::{AstraError, ErrorContext, Severity};
+use crate::error::{AstraError, ErrorContext};
 use crate::id::ArtifactId;
 use crate::time::Timestamp;
 use crate::validate::Validate;
@@ -91,15 +91,18 @@ impl ArtifactState {
     }
 
     /// Get valid next states from current state.
-    pub fn valid_transitions(&self) -> Vec<ArtifactState> {
+    ///
+    /// Returns a static slice for zero allocation. Variant ordering within
+    /// each slice is: forward progression first, then rejection, then deprecation.
+    pub fn valid_transitions(&self) -> &'static [ArtifactState] {
         use ArtifactState::*;
         match self {
-            Draft => vec![Proposed, Deprecated],
-            Proposed => vec![Validated, Draft, Deprecated],
-            Validated => vec![Approved, Draft, Deprecated],
-            Approved => vec![Released, Deprecated],
-            Released => vec![Deprecated],
-            Deprecated => vec![],
+            Draft => &[Proposed, Deprecated],
+            Proposed => &[Validated, Draft, Deprecated],
+            Validated => &[Approved, Draft, Deprecated],
+            Approved => &[Released, Deprecated],
+            Released => &[Deprecated],
+            Deprecated => &[],
         }
     }
 
@@ -299,17 +302,14 @@ impl Artifact {
             Ok(())
         } else {
             Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-072")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint(format!(
+                context: ErrorContext::validation(
+                    "VAL-072",
+                    format!(
                         "Valid transitions from {}: {:?}",
                         self.state,
                         self.state.valid_transitions()
-                    ))
-                    .build()
-                    .unwrap_or_default(),
+                    ),
+                ),
                 field: Some("state".into()),
                 message: format!("Invalid transition from {} to {}", self.state, new_state),
             })
@@ -343,13 +343,7 @@ impl Validate for Artifact {
         // VAL-070: Artifact type cannot be empty
         if self.artifact_type.trim().is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-070")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a non-empty artifact type")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation("VAL-070", "Provide a non-empty artifact type"),
                 field: Some("artifact_type".into()),
                 message: "Artifact.artifact_type cannot be empty".into(),
             });
@@ -358,13 +352,10 @@ impl Validate for Artifact {
         // VAL-071: Version cannot be empty
         if self.version.trim().is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-071")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide a non-empty artifact version")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-071",
+                    "Provide a non-empty artifact version",
+                ),
                 field: Some("version".into()),
                 message: "Artifact.version cannot be empty".into(),
             });

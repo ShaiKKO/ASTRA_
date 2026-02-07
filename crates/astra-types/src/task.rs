@@ -29,7 +29,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{AstraError, ErrorContext, Severity};
+use crate::error::{AstraError, ErrorContext};
 use crate::id::{ArtifactId, ContextId, TaskId, WorkspaceId};
 use crate::validate::Validate;
 
@@ -86,13 +86,10 @@ impl Validate for Budget {
     fn validate(&self) -> Result<(), AstraError> {
         if !self.cost_usd.is_finite() || self.cost_usd < 0.0 {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-014")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("cost_usd must be a non-negative finite number")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-014",
+                    "cost_usd must be a non-negative finite number",
+                ),
                 field: Some("cost_usd".into()),
                 message: format!(
                     "Invalid cost_usd value: {} (must be >= 0 and finite)",
@@ -196,12 +193,7 @@ impl Validate for TaskEnvelope {
 /// Helper to create a validation error for empty/missing fields.
 fn field_empty_error(code: &str, field: &str, message: &str) -> AstraError {
     AstraError::ValidationFailed {
-        context: ErrorContext::builder()
-            .error_code(code)
-            .component("astra-types")
-            .severity(Severity::Error)
-            .build()
-            .unwrap_or_default(),
+        context: ErrorContext::validation(code, message),
         field: Some(field.into()),
         message: message.into(),
     }

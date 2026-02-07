@@ -43,7 +43,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::error::{AstraError, ErrorContext, Severity};
+use crate::error::{AstraError, ErrorContext};
 use crate::validate::Validate;
 
 // ============================================================================
@@ -332,13 +332,10 @@ impl Validate for InferenceParams {
         // VAL-030: temperature must be non-negative and finite
         if !self.temperature.is_finite() || self.temperature < 0.0 {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-030")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("temperature must be >= 0.0 and finite")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-030",
+                    "temperature must be >= 0.0 and finite",
+                ),
                 field: Some("temperature".into()),
                 message: format!(
                     "temperature must be non-negative and finite, got {}",
@@ -351,13 +348,10 @@ impl Validate for InferenceParams {
         if let Some(max_tokens) = self.max_tokens {
             if max_tokens == 0 {
                 return Err(AstraError::ValidationFailed {
-                    context: ErrorContext::builder()
-                        .error_code("VAL-031")
-                        .component("astra-types")
-                        .severity(Severity::Error)
-                        .remediation_hint("max_tokens must be greater than 0")
-                        .build()
-                        .unwrap_or_default(),
+                    context: ErrorContext::validation(
+                        "VAL-031",
+                        "max_tokens must be greater than 0",
+                    ),
                     field: Some("max_tokens".into()),
                     message: "max_tokens must be greater than 0".into(),
                 });
@@ -368,13 +362,10 @@ impl Validate for InferenceParams {
         if let Some(top_p) = self.top_p {
             if !(0.0..=1.0).contains(&top_p) {
                 return Err(AstraError::ValidationFailed {
-                    context: ErrorContext::builder()
-                        .error_code("VAL-032")
-                        .component("astra-types")
-                        .severity(Severity::Error)
-                        .remediation_hint("top_p must be between 0.0 and 1.0")
-                        .build()
-                        .unwrap_or_default(),
+                    context: ErrorContext::validation(
+                        "VAL-032",
+                        "top_p must be between 0.0 and 1.0",
+                    ),
                     field: Some("top_p".into()),
                     message: format!("top_p must be in [0.0, 1.0], got {}", top_p),
                 });
@@ -471,13 +462,10 @@ impl Validate for ModelInvocation {
         // VAL-034: model_id must not be empty
         if self.model_id.is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-034")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Specify a model ID from the Model Registry")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-034",
+                    "Specify a model ID from the Model Registry",
+                ),
                 field: Some("model_id".into()),
                 message: "model_id cannot be empty".into(),
             });
@@ -486,13 +474,10 @@ impl Validate for ModelInvocation {
         // VAL-033: messages must not be empty
         if self.messages.is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-033")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide at least one message in the conversation")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-033",
+                    "Provide at least one message in the conversation",
+                ),
                 field: Some("messages".into()),
                 message: "messages cannot be empty".into(),
             });

@@ -11,7 +11,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{AstraError, ErrorContext, Severity};
+use crate::error::{AstraError, ErrorContext};
 use crate::id::ContextId;
 use crate::time::Timestamp;
 use crate::validate::Validate;
@@ -271,13 +271,10 @@ impl ContextItem {
             Ok(())
         } else {
             Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-076")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Only Hypothesis can be promoted to Fact")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-076",
+                    "Only Hypothesis can be promoted to Fact",
+                ),
                 field: Some("kind".into()),
                 message: format!("Cannot promote {} to Fact", self.kind),
             })
@@ -324,13 +321,10 @@ impl Validate for ContextItem {
         // VAL-073: Content cannot be empty
         if self.content.trim().is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-073")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide non-empty content for the context item")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-073",
+                    "Provide non-empty content for the context item",
+                ),
                 field: Some("content".into()),
                 message: "ContextItem.content cannot be empty".into(),
             });
@@ -339,13 +333,10 @@ impl Validate for ContextItem {
         // VAL-074: Source cannot be empty
         if self.source.trim().is_empty() {
             return Err(AstraError::ValidationFailed {
-                context: ErrorContext::builder()
-                    .error_code("VAL-074")
-                    .component("astra-types")
-                    .severity(Severity::Error)
-                    .remediation_hint("Provide non-empty source for the context item")
-                    .build()
-                    .unwrap_or_default(),
+                context: ErrorContext::validation(
+                    "VAL-074",
+                    "Provide non-empty source for the context item",
+                ),
                 field: Some("source".into()),
                 message: "ContextItem.source cannot be empty".into(),
             });
@@ -356,13 +347,10 @@ impl Validate for ContextItem {
             // VAL-077: Must be finite
             if !conf.is_finite() {
                 return Err(AstraError::ValidationFailed {
-                    context: ErrorContext::builder()
-                        .error_code("VAL-077")
-                        .component("astra-types")
-                        .severity(Severity::Error)
-                        .remediation_hint("Confidence must be a finite number")
-                        .build()
-                        .unwrap_or_default(),
+                    context: ErrorContext::validation(
+                        "VAL-077",
+                        "Confidence must be a finite number",
+                    ),
                     field: Some("confidence".into()),
                     message: "ContextItem.confidence must be finite".into(),
                 });
@@ -371,13 +359,10 @@ impl Validate for ContextItem {
             // VAL-075: Must be in range
             if !(0.0..=1.0).contains(&conf) {
                 return Err(AstraError::ValidationFailed {
-                    context: ErrorContext::builder()
-                        .error_code("VAL-075")
-                        .component("astra-types")
-                        .severity(Severity::Error)
-                        .remediation_hint("Confidence must be between 0.0 and 1.0 inclusive")
-                        .build()
-                        .unwrap_or_default(),
+                    context: ErrorContext::validation(
+                        "VAL-075",
+                        "Confidence must be between 0.0 and 1.0 inclusive",
+                    ),
                     field: Some("confidence".into()),
                     message: format!("ContextItem.confidence must be 0.0-1.0, got {}", conf),
                 });
