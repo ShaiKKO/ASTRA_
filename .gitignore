@@ -1,0 +1,49 @@
+# ASTRA_ Git Ignore Rules
+# See AGENTS.md Section 16 for rationale.
+
+# ── Rust build artifacts ──────────────────────────────────────
+/target/
+
+# ── Secrets (NEVER commit) ────────────────────────────────────
+.env
+.env.*
+
+# ── OS and editor files ───────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# ── Local AI agent configuration ─────────────────────────────
+# These files contain machine-specific AI agent guidance and
+# are not intended for version control.
+/AGENTS.md
+/CLAUDE.md
+
+# ── Local planning and design documents ───────────────────────
+# Entire docs/ directory is local until individual documents are
+# explicitly ready for version control. To track a specific doc,
+# use: git add -f docs/my-document.md
+/docs/
+
+# ── Python (future-proofing for Issue #11) ────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+dist/
+build/
+*.whl
+
+# ── Coverage artifacts ────────────────────────────────────────
+lcov.info
+*.lcov
+coverage.xml
+htmlcov/
